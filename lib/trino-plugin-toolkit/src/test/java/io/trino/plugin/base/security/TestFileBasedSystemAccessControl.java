@@ -36,6 +36,7 @@ import org.testng.annotations.Test;
 import javax.security.auth.kerberos.KerberosPrincipal;
 
 import java.io.File;
+import java.io.UncheckedIOException;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
@@ -1395,13 +1396,13 @@ public class TestFileBasedSystemAccessControl
         sleep(2);
 
         assertThatThrownBy(() -> accessControl.checkCanCreateView(alice, aliceView))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("Invalid JSON file");
+                .isInstanceOf(UncheckedIOException.class)
+                .hasMessageStartingWith("Failed to parse JSON");
 
         // test if file based cached control was not cached somewhere
         assertThatThrownBy(() -> accessControl.checkCanCreateView(alice, aliceView))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("Invalid JSON file");
+                .isInstanceOf(UncheckedIOException.class)
+                .hasMessageStartingWith("Failed to parse JSON");
 
         copy(new File(getResourcePath("file-based-system-catalog.json")), configFile);
         sleep(2);
@@ -1413,7 +1414,7 @@ public class TestFileBasedSystemAccessControl
     public void parseUnknownRules()
     {
         assertThatThrownBy(() -> newFileBasedSystemAccessControl("file-based-system-security-config-file-with-unknown-rules.json"))
-                .hasMessageContaining("Invalid JSON");
+                .hasMessageContaining("Failed to parse JSON");
     }
 
     private SystemAccessControl newFileBasedSystemAccessControl(String resourceName)
