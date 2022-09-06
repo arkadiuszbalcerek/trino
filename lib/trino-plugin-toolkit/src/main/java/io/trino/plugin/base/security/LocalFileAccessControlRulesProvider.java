@@ -19,11 +19,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
-import java.util.function.Supplier;
 
-import static io.trino.plugin.base.security.FileBasedAccessControlUtils.parseJSONString;
 import static java.lang.String.format;
-import static java.util.Objects.requireNonNull;
 
 public class LocalFileAccessControlRulesProvider<R>
         extends RulesProvider<R>

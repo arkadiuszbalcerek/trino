@@ -29,7 +29,7 @@ public final class FileBasedAccessControlUtils
 
     public static <R> R parseJSONString(String jsonString, String jsonPointer, Class<R> clazz)
     {
-        JsonNode node = JsonUtils.parseJson(jsonString);
+        JsonNode node = JsonUtils.parseJson(jsonString, JsonNode.class);
         JsonNode mappingsNode = node.at(jsonPointer);
         return JsonUtils.jsonTreeToValue(mappingsNode, clazz);
     }

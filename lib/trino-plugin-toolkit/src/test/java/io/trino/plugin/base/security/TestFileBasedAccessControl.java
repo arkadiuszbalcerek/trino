@@ -492,7 +492,7 @@ public class TestFileBasedAccessControl
     public void testInvalidRules()
     {
         assertThatThrownBy(() -> createAccessControl("invalid.json"))
-                .hasMessageContaining("Failed to parse JSON");
+                .hasMessageContaining("Failed to convert JSON tree node");
     }
 
     @Test

@@ -24,7 +24,8 @@ public abstract class RulesProvider<R>
     protected final String jsonPointer;
     protected final Class<R> clazz;
 
-    public RulesProvider(FileBasedAccessControlConfig config, Class<R> clazz) {
+    public RulesProvider(FileBasedAccessControlConfig config, Class<R> clazz)
+    {
         this.clazz = requireNonNull(clazz);
         this.jsonPointer = requireNonNull(config.getJsonPointer());
     }

@@ -1397,12 +1397,12 @@ public class TestFileBasedSystemAccessControl
 
         assertThatThrownBy(() -> accessControl.checkCanCreateView(alice, aliceView))
                 .isInstanceOf(UncheckedIOException.class)
-                .hasMessageStartingWith("Failed to parse JSON");
+                .hasMessageStartingWith("Failed to convert JSON tree node");
 
         // test if file based cached control was not cached somewhere
         assertThatThrownBy(() -> accessControl.checkCanCreateView(alice, aliceView))
                 .isInstanceOf(UncheckedIOException.class)
-                .hasMessageStartingWith("Failed to parse JSON");
+                .hasMessageStartingWith("Failed to convert JSON tree node");
 
         copy(new File(getResourcePath("file-based-system-catalog.json")), configFile);
         sleep(2);
@@ -1414,7 +1414,7 @@ public class TestFileBasedSystemAccessControl
     public void parseUnknownRules()
     {
         assertThatThrownBy(() -> newFileBasedSystemAccessControl("file-based-system-security-config-file-with-unknown-rules.json"))
-                .hasMessageContaining("Failed to parse JSON");
+                .hasMessageContaining("Failed to convert JSON tree node");
     }
 
     private SystemAccessControl newFileBasedSystemAccessControl(String resourceName)

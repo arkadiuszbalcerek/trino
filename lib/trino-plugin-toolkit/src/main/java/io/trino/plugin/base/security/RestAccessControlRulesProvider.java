@@ -19,11 +19,9 @@ import io.airlift.http.client.Request;
 import io.airlift.http.client.StringResponseHandler.StringResponse;
 
 import java.net.URI;
-import java.util.function.Supplier;
 
 import static io.airlift.http.client.Request.Builder.prepareGet;
 import static io.airlift.http.client.StringResponseHandler.createStringResponseHandler;
-import static io.trino.plugin.base.security.FileBasedAccessControlUtils.parseJSONString;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
