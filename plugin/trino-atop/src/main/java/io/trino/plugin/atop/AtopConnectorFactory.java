@@ -71,7 +71,6 @@ public class AtopConnectorFactory
                             binder -> {
                                 FileBasedAccessControlModule module = new FileBasedAccessControlModule();
                                 module.setConfigurationFactory(new ConfigurationFactory(requiredConfig));
-                                module.configure(binder);
                                 binder.install(module);
                                 binder.install(new JsonModule());
                             }));

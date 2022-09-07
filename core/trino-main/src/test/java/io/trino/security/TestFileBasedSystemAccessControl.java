@@ -805,14 +805,14 @@ public class TestFileBasedSystemAccessControl
                     accessControlManager.checkCanCreateView(new SecurityContext(transactionId, alice, queryId), aliceView);
                 }))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageStartingWith("Failed to parse JSON");
+                .hasMessageStartingWith("Failed to convert JSON tree node");
         // test if file based cached control was not cached somewhere
         assertThatThrownBy(() -> transaction(transactionManager, accessControlManager)
                 .execute(transactionId -> {
                     accessControlManager.checkCanCreateView(new SecurityContext(transactionId, alice, queryId), aliceView);
                 }))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageStartingWith("Failed to parse JSON");
+                .hasMessageStartingWith("Failed to convert JSON tree node");
 
         copy(new File(getResourcePath("catalog.json")), configFile);
         sleep(2);
@@ -828,7 +828,7 @@ public class TestFileBasedSystemAccessControl
     {
         assertThatThrownBy(() -> newAccessControlManager(createTestTransactionManager(), "catalog_allow_unset.json"))
                 .isInstanceOf(ProvisionException.class)
-                .hasMessageContaining("Failed to parse JSON");
+                .hasMessageContaining("Failed to convert JSON tree node");
     }
 
     @Test
@@ -836,7 +836,7 @@ public class TestFileBasedSystemAccessControl
     {
         assertThatThrownBy(() -> newAccessControlManager(createTestTransactionManager(), "catalog_invalid_allow_value.json"))
                 .isInstanceOf(ProvisionException.class)
-                .hasMessageContaining("Failed to parse JSON");
+                .hasMessageContaining("Failed to convert JSON tree node");
     }
 
     private AccessControlManager newAccessControlManager(TransactionManager transactionManager, String resourceName)
@@ -862,7 +862,7 @@ public class TestFileBasedSystemAccessControl
     public void parseUnknownRules()
     {
         assertThatThrownBy(() -> parse("src/test/resources/security-config-file-with-unknown-rules.json"))
-                .hasMessageContaining("Failed to parse JSON");
+                .hasMessageContaining("Failed to convert JSON tree node");
     }
 
     private void parse(String path)
