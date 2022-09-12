@@ -133,13 +133,13 @@ public class QueryMonitor
         this.operatorStatsCodec = requireNonNull(operatorStatsCodec, "operatorStatsCodec is null");
         this.statsAndCostsCodec = requireNonNull(statsAndCostsCodec, "statsAndCostsCodec is null");
         this.executionFailureInfoCodec = requireNonNull(executionFailureInfoCodec, "executionFailureInfoCodec is null");
-        this.serverVersion = requireNonNull(nodeVersion, "nodeVersion is null").toString();
-        this.serverAddress = requireNonNull(nodeInfo, "nodeInfo is null").getExternalAddress();
-        this.environment = requireNonNull(nodeInfo, "nodeInfo is null").getEnvironment();
+        this.serverVersion = nodeVersion.toString();
+        this.serverAddress = nodeInfo.getExternalAddress();
+        this.environment = nodeInfo.getEnvironment();
         this.sessionPropertyManager = requireNonNull(sessionPropertyManager, "sessionPropertyManager is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.functionManager = requireNonNull(functionManager, "functionManager is null");
-        this.maxJsonLimit = toIntExact(requireNonNull(config, "config is null").getMaxOutputStageJsonSize().toBytes());
+        this.maxJsonLimit = toIntExact(config.getMaxOutputStageJsonSize().toBytes());
     }
 
     public void queryCreatedEvent(BasicQueryInfo queryInfo)
