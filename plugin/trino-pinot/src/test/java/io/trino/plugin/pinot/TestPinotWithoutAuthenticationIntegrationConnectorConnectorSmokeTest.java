@@ -11,20 +11,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.trino.plugin.deltalake;
+package io.trino.plugin.pinot;
 
-import io.trino.plugin.hive.metastore.HiveMetastore;
-import io.trino.plugin.hive.security.AccessControlMetadata;
-
-public interface DeltaLakeAccessControlMetadataFactory
+public class TestPinotWithoutAuthenticationIntegrationConnectorConnectorSmokeTest
+        extends BasePinotIntegrationConnectorSmokeTest
 {
-    DeltaLakeAccessControlMetadataFactory SYSTEM = metastore -> new AccessControlMetadata() {
-        @Override
-        public boolean isUsingSystemSecurity()
-        {
-            return true;
-        }
-    };
-
-    AccessControlMetadata create(HiveMetastore metastore);
+    @Override
+    protected boolean isSecured()
+    {
+        return false;
+    }
 }

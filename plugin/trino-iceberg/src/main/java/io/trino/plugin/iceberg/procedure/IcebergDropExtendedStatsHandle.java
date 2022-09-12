@@ -11,28 +11,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.trino.plugin.pinot;
+package io.trino.plugin.iceberg.procedure;
 
-import static io.trino.plugin.pinot.TestingPinotCluster.PINOT_LATEST_IMAGE_NAME;
+import static com.google.common.base.MoreObjects.toStringHelper;
 
-public class TestPinotWithoutAuthenticationIntegrationSmokeTestLatestVersionNoGrpc
-        extends AbstractPinotIntegrationSmokeTest
+public class IcebergDropExtendedStatsHandle
+        extends IcebergProcedureHandle
 {
     @Override
-    protected boolean isSecured()
+    public String toString()
     {
-        return false;
-    }
-
-    @Override
-    protected String getPinotImageName()
-    {
-        return PINOT_LATEST_IMAGE_NAME;
-    }
-
-    @Override
-    protected boolean isGrpcEnabled()
-    {
-        return false;
+        return toStringHelper(this)
+                .toString();
     }
 }

@@ -40,7 +40,6 @@ import io.trino.plugin.hive.metastore.ForwardingHiveMetastore;
 import io.trino.plugin.hive.metastore.HiveMetastore;
 import io.trino.plugin.hive.metastore.HiveMetastoreConfig;
 import io.trino.plugin.hive.metastore.HiveMetastoreFactory;
-import io.trino.plugin.hive.metastore.MetastoreTypeConfig;
 import io.trino.plugin.hive.metastore.PrincipalPrivileges;
 import io.trino.plugin.hive.metastore.StorageFormat;
 import io.trino.plugin.hive.metastore.Table;
@@ -216,7 +215,7 @@ public abstract class AbstractTestHiveFileSystem
                 SqlStandardAccessControlMetadata::new,
                 new FileSystemDirectoryLister(),
                 new PartitionProjectionService(config, ImmutableMap.of(), new TestingTypeManager()),
-                new MetastoreTypeConfig());
+                true);
         transactionManager = new HiveTransactionManager(metadataFactory);
         splitManager = new HiveSplitManager(
                 transactionManager,
@@ -611,15 +610,13 @@ public abstract class AbstractTestHiveFileSystem
         public void dropTable(String databaseName, String tableName, boolean deleteData)
         {
             try {
-                Optional<Table> table = getTable(databaseName, tableName);
-                if (table.isEmpty()) {
-                    throw new TableNotFoundException(new SchemaTableName(databaseName, tableName));
-                }
+                Table table = getTable(databaseName, tableName)
+                        .orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
 
                 // hack to work around the metastore not being configured for S3 or other FS
                 List<String> locations = listAllDataPaths(databaseName, tableName);
 
-                Table.Builder tableBuilder = Table.builder(table.get());
+                Table.Builder tableBuilder = Table.builder(table);
                 tableBuilder.getStorageBuilder().setLocation("/");
 
                 // drop table
@@ -641,12 +638,9 @@ public abstract class AbstractTestHiveFileSystem
 
         public void updateTableLocation(String databaseName, String tableName, String location)
         {
-            Optional<Table> table = getTable(databaseName, tableName);
-            if (table.isEmpty()) {
-                throw new TableNotFoundException(new SchemaTableName(databaseName, tableName));
-            }
-
-            Table.Builder tableBuilder = Table.builder(table.get());
+            Table table = getTable(databaseName, tableName)
+                    .orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
+            Table.Builder tableBuilder = Table.builder(table);
             tableBuilder.getStorageBuilder().setLocation(location);
 
             // NOTE: this clears the permissions

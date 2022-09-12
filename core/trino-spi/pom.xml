@@ -5,7 +5,7 @@
     <parent>
         <groupId>io.trino</groupId>
         <artifactId>trino-root</artifactId>
-        <version>395-SNAPSHOT</version>
+        <version>396-SNAPSHOT</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
@@ -188,6 +188,14 @@
                                 <item>
                                     <code>java.method.addedToInterface</code>
                                     <new>method io.trino.spi.block.BlockBuilder io.trino.spi.block.BlockBuilder::newBlockBuilderLike(int, io.trino.spi.block.BlockBuilderStatus)</new>
+                                </item>
+                                <item>
+                                    <code>java.field.removed</code>
+                                    <old>field io.trino.spi.expression.StandardFunctions.LIKE_PATTERN_FUNCTION_NAME</old>
+                                </item>
+                                <item>
+                                    <code>java.method.returnTypeChanged</code>
+                                    <new>method io.trino.spi.block.Block io.trino.spi.block.ArrayBlockBuilder::build()</new>
                                 </item>
                             </differences>
                         </revapi.differences>

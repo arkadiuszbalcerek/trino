@@ -11,7 +11,7 @@
 
     <groupId>io.trino</groupId>
     <artifactId>trino-root</artifactId>
-    <version>395-SNAPSHOT</version>
+    <version>396-SNAPSHOT</version>
 
     <name>trino-root</name>
     <description>Trino</description>
@@ -49,7 +49,7 @@
 
         <dep.accumulo.version>1.7.4</dep.accumulo.version>
         <dep.accumulo-hadoop.version>2.7.7-1</dep.accumulo-hadoop.version>
-        <dep.antlr.version>4.9.3</dep.antlr.version>
+        <dep.antlr.version>4.11.1</dep.antlr.version>
         <dep.airlift.version>218</dep.airlift.version>
         <dep.slf4j.version>1.7.36</dep.slf4j.version>
         <dep.packaging.version>${dep.airlift.version}</dep.packaging.version>
@@ -70,6 +70,7 @@
         <dep.casandra.version>4.14.0</dep.casandra.version>
         <dep.minio.version>7.1.4</dep.minio.version>
         <dep.iceberg.version>0.14.0</dep.iceberg.version>
+        <dep.spotbugs-annotations.version>4.7.2</dep.spotbugs-annotations.version>
 
         <dep.docker.images.version>65</dep.docker.images.version>
 
@@ -1166,7 +1167,7 @@
             <dependency>
                 <groupId>com.linkedin.calcite</groupId>
                 <artifactId>calcite-core</artifactId>
-                <version>1.21.0.151</version>
+                <version>1.21.0.152</version>
                 <classifier>shaded</classifier>
                 <exclusions>
                     <exclusion>
@@ -1690,7 +1691,7 @@
                 <groupId>org.jdbi</groupId>
                 <artifactId>jdbi3-bom</artifactId>
                 <type>pom</type>
-                <version>3.23.0</version>
+                <version>3.32.0</version>
                 <scope>import</scope>
             </dependency>
 

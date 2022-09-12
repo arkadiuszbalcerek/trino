@@ -11,19 +11,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.trino.parquet.writer.repdef;
+package io.trino.plugin.pinot;
 
-import com.google.common.collect.AbstractIterator;
+import static io.trino.plugin.pinot.TestingPinotCluster.PINOT_LATEST_IMAGE_NAME;
 
-import java.util.OptionalInt;
-
-public interface DefLevelIterable
+public class TestPinotWithoutAuthenticationIntegrationLatestVersionConnectorConnectorSmokeTest
+        extends BasePinotIntegrationConnectorSmokeTest
 {
-    DefLevelIterator getIterator();
-
-    abstract class DefLevelIterator
-            extends AbstractIterator<OptionalInt>
+    @Override
+    protected boolean isSecured()
     {
-        abstract boolean end();
+        return false;
+    }
+
+    @Override
+    protected String getPinotImageName()
+    {
+        return PINOT_LATEST_IMAGE_NAME;
     }
 }

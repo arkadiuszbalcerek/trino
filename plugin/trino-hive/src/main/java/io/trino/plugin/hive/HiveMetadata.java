@@ -371,7 +371,7 @@ public class HiveMetadata
     private final AccessControlMetadata accessControlMetadata;
     private final DirectoryLister directoryLister;
     private final PartitionProjectionService partitionProjectionService;
-    private final String metastoreType;
+    private final boolean allowTableRename;
 
     public HiveMetadata(
             CatalogName catalogName,
@@ -396,7 +396,7 @@ public class HiveMetadata
             AccessControlMetadata accessControlMetadata,
             DirectoryLister directoryLister,
             PartitionProjectionService partitionProjectionService,
-            String metastoreType)
+            boolean allowTableRename)
     {
         this.catalogName = requireNonNull(catalogName, "catalogName is null");
         this.metastore = requireNonNull(metastore, "metastore is null");
@@ -420,7 +420,7 @@ public class HiveMetadata
         this.accessControlMetadata = requireNonNull(accessControlMetadata, "accessControlMetadata is null");
         this.directoryLister = requireNonNull(directoryLister, "directoryLister is null");
         this.partitionProjectionService = requireNonNull(partitionProjectionService, "partitionProjectionService is null");
-        this.metastoreType = requireNonNull(metastoreType, "metastoreType is null");
+        this.allowTableRename = allowTableRename;
     }
 
     @Override
@@ -1266,8 +1266,8 @@ public class HiveMetadata
     @Override
     public void renameTable(ConnectorSession session, ConnectorTableHandle tableHandle, SchemaTableName newTableName)
     {
-        if (metastoreType.equalsIgnoreCase("glue")) {
-            throw new TrinoException(NOT_SUPPORTED, "Table rename is not yet supported by Glue service");
+        if (!allowTableRename) {
+            throw new TrinoException(NOT_SUPPORTED, "Table rename is not supported with current metastore configuration");
         }
         HiveTableHandle handle = (HiveTableHandle) tableHandle;
         metastore.renameTable(handle.getSchemaName(), handle.getTableName(), newTableName.getSchemaName(), newTableName.getTableName());
@@ -2715,12 +2715,10 @@ public class HiveMetadata
     {
         HiveTableHandle handle = (HiveTableHandle) deleteHandle;
 
-        Optional<Table> table = metastore.getTable(handle.getSchemaName(), handle.getTableName());
-        if (table.isEmpty()) {
-            throw new TableNotFoundException(handle.getSchemaTableName());
-        }
+        Table table = metastore.getTable(handle.getSchemaName(), handle.getTableName())
+                .orElseThrow(() -> new TableNotFoundException(handle.getSchemaTableName()));
 
-        if (table.get().getPartitionColumns().isEmpty()) {
+        if (table.getPartitionColumns().isEmpty()) {
             metastore.truncateUnpartitionedTable(session, handle.getSchemaName(), handle.getTableName());
         }
         else {
