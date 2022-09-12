@@ -613,11 +613,8 @@ class StatementAnalyzer
         protected Scope visitRefreshMaterializedView(RefreshMaterializedView refreshMaterializedView, Optional<Scope> scope)
         {
             QualifiedObjectName name = createQualifiedObjectName(session, refreshMaterializedView, refreshMaterializedView.getName());
-            Optional<MaterializedViewDefinition> optionalView = metadata.getMaterializedView(session, name);
-
-            if (optionalView.isEmpty()) {
-                throw semanticException(TABLE_NOT_FOUND, refreshMaterializedView, "Materialized view '%s' does not exist", name);
-            }
+            MaterializedViewDefinition view = metadata.getMaterializedView(session, name)
+                    .orElseThrow(() -> semanticException(TABLE_NOT_FOUND, refreshMaterializedView, "Materialized view '%s' does not exist", name));
 
             accessControl.checkCanRefreshMaterializedView(session.toSecurityContext(), name);
             analysis.setUpdateType("REFRESH MATERIALIZED VIEW");
@@ -631,38 +628,33 @@ class StatementAnalyzer
                 return createAndAssignScope(refreshMaterializedView, scope);
             }
 
-            Optional<QualifiedName> storageName = getMaterializedViewStorageTableName(optionalView.get());
+            QualifiedName storageName = getMaterializedViewStorageTableName(view)
+                    .orElseThrow(() -> semanticException(TABLE_NOT_FOUND, refreshMaterializedView, "Storage Table for materialized view '%s' does not exist", name));
 
-            if (storageName.isEmpty()) {
-                throw semanticException(TABLE_NOT_FOUND, refreshMaterializedView, "Storage Table '%s' for materialized view '%s' does not exist", storageName, name);
-            }
-
-            QualifiedObjectName targetTable = createQualifiedObjectName(session, refreshMaterializedView, storageName.get());
+            QualifiedObjectName targetTable = createQualifiedObjectName(session, refreshMaterializedView, storageName);
             checkStorageTableNotRedirected(targetTable);
 
             // analyze the query that creates the data
-            Query query = parseView(optionalView.get().getOriginalSql(), name, refreshMaterializedView);
+            Query query = parseView(view.getOriginalSql(), name, refreshMaterializedView);
             Scope queryScope = process(query, scope);
 
             // verify the insert destination columns match the query
-            Optional<TableHandle> targetTableHandle = metadata.getTableHandle(session, targetTable);
-            if (targetTableHandle.isEmpty()) {
-                throw semanticException(TABLE_NOT_FOUND, refreshMaterializedView, "Table '%s' does not exist", targetTable);
-            }
+            TableHandle targetTableHandle = metadata.getTableHandle(session, targetTable)
+                    .orElseThrow(() -> semanticException(TABLE_NOT_FOUND, refreshMaterializedView, "Table '%s' does not exist", targetTable));
 
             analysis.setSkipMaterializedViewRefresh(metadata.getMaterializedViewFreshness(session, name).isMaterializedViewFresh());
 
-            TableMetadata tableMetadata = metadata.getTableMetadata(session, targetTableHandle.get());
+            TableMetadata tableMetadata = metadata.getTableMetadata(session, targetTableHandle);
             List<String> insertColumns = tableMetadata.getColumns().stream()
                     .filter(column -> !column.isHidden())
                     .map(ColumnMetadata::getName)
                     .collect(toImmutableList());
 
-            Map<String, ColumnHandle> columnHandles = metadata.getColumnHandles(session, targetTableHandle.get());
+            Map<String, ColumnHandle> columnHandles = metadata.getColumnHandles(session, targetTableHandle);
 
             analysis.setRefreshMaterializedView(new Analysis.RefreshMaterializedViewAnalysis(
                     refreshMaterializedView.getTable(),
-                    targetTableHandle.get(), query,
+                    targetTableHandle, query,
                     insertColumns.stream().map(columnHandles::get).collect(toImmutableList())));
 
             List<Type> tableTypes = insertColumns.stream()
@@ -756,6 +748,9 @@ class StatementAnalyzer
         {
             Table table = node.getTable();
             QualifiedObjectName originalName = createQualifiedObjectName(session, table, table.getName());
+            if (metadata.isMaterializedView(session, originalName)) {
+                throw semanticException(NOT_SUPPORTED, node, "Deleting from materialized views is not supported");
+            }
             if (metadata.isView(session, originalName)) {
                 throw semanticException(NOT_SUPPORTED, node, "Deleting from views is not supported");
             }
@@ -921,10 +916,8 @@ class StatementAnalyzer
                     if (layout.getLayout().getPartitioning().isPresent()) {
                         throw new TrinoException(NOT_SUPPORTED, "INSERT must write all distribution columns: " + layout.getPartitionColumns());
                     }
-                    else {
-                        // created table does not contain all columns required by preferred layout
-                        newTableLayout = Optional.empty();
-                    }
+                    // created table does not contain all columns required by preferred layout
+                    newTableLayout = Optional.empty();
                 }
             }
 
@@ -1348,15 +1341,13 @@ class StatementAnalyzer
             // TODO: collect errors and return them all at once
             Set<String> names = new HashSet<>();
             for (Field field : descriptor.getVisibleFields()) {
-                Optional<String> fieldName = field.getName();
-                if (fieldName.isEmpty()) {
-                    throw semanticException(MISSING_COLUMN_NAME, node, "Column name not specified at position %s", descriptor.indexOf(field) + 1);
-                }
-                if (!names.add(fieldName.get())) {
-                    throw semanticException(DUPLICATE_COLUMN_NAME, node, "Column name '%s' specified more than once", fieldName.get());
+                String fieldName = field.getName()
+                        .orElseThrow(() -> semanticException(MISSING_COLUMN_NAME, node, "Column name not specified at position %s", descriptor.indexOf(field) + 1));
+                if (!names.add(fieldName)) {
+                    throw semanticException(DUPLICATE_COLUMN_NAME, node, "Column name '%s' specified more than once", fieldName);
                 }
                 if (field.getType().equals(UNKNOWN)) {
-                    throw semanticException(COLUMN_TYPE_UNKNOWN, node, "Column type is unknown: %s", fieldName.get());
+                    throw semanticException(COLUMN_TYPE_UNKNOWN, node, "Column type is unknown: %s", fieldName);
                 }
             }
         }
@@ -1794,23 +1785,16 @@ class StatementAnalyzer
             if (optionalMaterializedView.isPresent()) {
                 if (metadata.getMaterializedViewFreshness(session, name).isMaterializedViewFresh()) {
                     // If materialized view is current, answer the query using the storage table
-                    Optional<QualifiedName> storageName = getMaterializedViewStorageTableName(optionalMaterializedView.get());
-                    if (storageName.isEmpty()) {
-                        throw semanticException(INVALID_VIEW, table, "Materialized view '%s' is fresh but does not have storage table name", name);
-                    }
-                    QualifiedObjectName storageTableName = createQualifiedObjectName(session, table, storageName.get());
+                    QualifiedName storageName = getMaterializedViewStorageTableName(optionalMaterializedView.get())
+                            .orElseThrow(() -> semanticException(INVALID_VIEW, table, "Materialized view '%s' is fresh but does not have storage table name", name));
+                    QualifiedObjectName storageTableName = createQualifiedObjectName(session, table, storageName);
                     checkStorageTableNotRedirected(storageTableName);
-                    Optional<TableHandle> tableHandle = metadata.getTableHandle(session, storageTableName);
-                    if (tableHandle.isEmpty()) {
-                        throw semanticException(INVALID_VIEW, table, "Storage table '%s' does not exist", storageTableName);
-                    }
-
-                    return createScopeForMaterializedView(table, name, scope, optionalMaterializedView.get(), tableHandle);
+                    TableHandle tableHandle = metadata.getTableHandle(session, storageTableName)
+                            .orElseThrow(() -> semanticException(INVALID_VIEW, table, "Storage table '%s' does not exist", storageTableName));
+                    return createScopeForMaterializedView(table, name, scope, optionalMaterializedView.get(), Optional.of(tableHandle));
                 }
-                else {
-                    // This is a stale materialized view and should be expanded like a logical view
-                    return createScopeForMaterializedView(table, name, scope, optionalMaterializedView.get(), Optional.empty());
-                }
+                // This is a stale materialized view and should be expanded like a logical view
+                return createScopeForMaterializedView(table, name, scope, optionalMaterializedView.get(), Optional.empty());
             }
 
             // This could be a reference to a logical view or a table
@@ -2709,8 +2693,11 @@ class StatementAnalyzer
         {
             Table table = update.getTable();
             QualifiedObjectName originalName = createQualifiedObjectName(session, table, table.getName());
+            if (metadata.isMaterializedView(session, originalName)) {
+                throw semanticException(NOT_SUPPORTED, update, "Updating materialized views is not supported");
+            }
             if (metadata.isView(session, originalName)) {
-                throw semanticException(NOT_SUPPORTED, update, "Updating through views is not supported");
+                throw semanticException(NOT_SUPPORTED, update, "Updating views is not supported");
             }
 
             RedirectionAwareTableHandle redirection = metadata.getRedirectionAwareTableHandle(session, originalName);
@@ -2812,8 +2799,11 @@ class StatementAnalyzer
             Relation relation = merge.getTarget();
             Table table = getMergeTargetTable(relation);
             QualifiedObjectName tableName = createQualifiedObjectName(session, table, table.getName());
+            if (metadata.isMaterializedView(session, tableName)) {
+                throw semanticException(NOT_SUPPORTED, merge, "Merging into materialized views is not supported");
+            }
             if (metadata.getView(session, tableName).isPresent()) {
-                throw semanticException(NOT_SUPPORTED, merge, "MERGE INTO a view is not supported");
+                throw semanticException(NOT_SUPPORTED, merge, "Merging into views is not supported");
             }
 
             TableHandle targetTableHandle = metadata.getTableHandle(session, tableName)
@@ -3069,35 +3059,30 @@ class StatementAnalyzer
                     throw semanticException(DUPLICATE_COLUMN_NAME, column, "Column '%s' appears multiple times in USING clause", column.getValue());
                 }
 
-                Optional<ResolvedField> leftField = left.tryResolveField(column);
-                Optional<ResolvedField> rightField = right.tryResolveField(column);
-
-                if (leftField.isEmpty()) {
-                    throw semanticException(COLUMN_NOT_FOUND, column, "Column '%s' is missing from left side of join", column.getValue());
-                }
-                if (rightField.isEmpty()) {
-                    throw semanticException(COLUMN_NOT_FOUND, column, "Column '%s' is missing from right side of join", column.getValue());
-                }
+                ResolvedField leftField = left.tryResolveField(column)
+                        .orElseThrow(() -> semanticException(COLUMN_NOT_FOUND, column, "Column '%s' is missing from left side of join", column.getValue()));
+                ResolvedField rightField = right.tryResolveField(column)
+                        .orElseThrow(() -> semanticException(COLUMN_NOT_FOUND, column, "Column '%s' is missing from right side of join", column.getValue()));
 
                 // ensure a comparison operator exists for the given types (applying coercions if necessary)
                 try {
                     metadata.resolveOperator(session, OperatorType.EQUAL, ImmutableList.of(
-                            leftField.get().getType(), rightField.get().getType()));
+                            leftField.getType(), rightField.getType()));
                 }
                 catch (OperatorNotFoundException e) {
                     throw semanticException(TYPE_MISMATCH, column, e, "%s", e.getMessage());
                 }
 
-                Optional<Type> type = typeCoercion.getCommonSuperType(leftField.get().getType(), rightField.get().getType());
+                Optional<Type> type = typeCoercion.getCommonSuperType(leftField.getType(), rightField.getType());
                 analysis.addTypes(ImmutableMap.of(NodeRef.of(column), type.orElseThrow()));
 
                 joinFields.add(Field.newUnqualified(column.getValue(), type.get()));
 
-                leftJoinFields.add(leftField.get().getRelationFieldIndex());
-                rightJoinFields.add(rightField.get().getRelationFieldIndex());
+                leftJoinFields.add(leftField.getRelationFieldIndex());
+                rightJoinFields.add(rightField.getRelationFieldIndex());
 
-                recordColumnAccess(leftField.get().getField());
-                recordColumnAccess(rightField.get().getField());
+                recordColumnAccess(leftField.getField());
+                recordColumnAccess(rightField.getField());
             }
 
             ImmutableList.Builder<Field> outputs = ImmutableList.builder();
@@ -3178,15 +3163,12 @@ class StatementAnalyzer
                 }
 
                 // determine common super type of the rows
-                Optional<Type> partialSuperType = typeCoercion.getCommonSuperType(rowType, commonSuperType);
-                if (partialSuperType.isEmpty()) {
-                    throw semanticException(TYPE_MISMATCH,
-                            node,
-                            "Values rows have mismatched types: %s vs %s",
-                            rowTypes.get(0),
-                            rowType);
-                }
-                commonSuperType = partialSuperType.get();
+                commonSuperType = typeCoercion.getCommonSuperType(rowType, commonSuperType)
+                        .orElseThrow(() -> semanticException(TYPE_MISMATCH,
+                                node,
+                                "Values rows have mismatched types: %s vs %s",
+                                rowTypes.get(0),
+                                rowType));
             }
 
             // add coercions
@@ -3723,22 +3705,20 @@ class StatementAnalyzer
                 QualifiedName prefix = asQualifiedName(expression);
                 if (prefix != null) {
                     // analyze prefix as an 'asterisked identifier chain'
-                    Optional<AsteriskedIdentifierChainBasis> identifierChainBasis = scope.resolveAsteriskedIdentifierChainBasis(prefix, allColumns);
-                    if (identifierChainBasis.isEmpty()) {
-                        throw semanticException(TABLE_NOT_FOUND, allColumns, "Unable to resolve reference %s", prefix);
-                    }
-                    if (identifierChainBasis.get().getBasisType() == TABLE) {
-                        RelationType relationType = identifierChainBasis.get().getRelationType().orElseThrow();
+                    AsteriskedIdentifierChainBasis identifierChainBasis = scope.resolveAsteriskedIdentifierChainBasis(prefix, allColumns)
+                            .orElseThrow(() -> semanticException(TABLE_NOT_FOUND, allColumns, "Unable to resolve reference %s", prefix));
+                    if (identifierChainBasis.getBasisType() == TABLE) {
+                        RelationType relationType = identifierChainBasis.getRelationType().orElseThrow();
                         List<Field> fields = filterInaccessibleFields(relationType.resolveVisibleFieldsWithRelationPrefix(Optional.of(prefix)));
                         if (fields.isEmpty()) {
                             throw semanticException(COLUMN_NOT_FOUND, allColumns, "SELECT * not allowed from relation that has no columns");
                         }
-                        boolean local = scope.isLocalScope(identifierChainBasis.get().getScope().orElseThrow());
+                        boolean local = scope.isLocalScope(identifierChainBasis.getScope().orElseThrow());
                         analyzeAllColumnsFromTable(
                                 fields,
                                 allColumns,
                                 node,
-                                local ? scope : identifierChainBasis.get().getScope().get(),
+                                local ? scope : identifierChainBasis.getScope().get(),
                                 outputExpressionBuilder,
                                 selectExpressionBuilder,
                                 relationType,
@@ -4684,9 +4664,7 @@ class StatementAnalyzer
             if (node instanceof FetchFirst) {
                 return analyzeLimit((FetchFirst) node, scope);
             }
-            else {
-                return analyzeLimit((Limit) node, scope);
-            }
+            return analyzeLimit((Limit) node, scope);
         }
 
         private boolean analyzeLimit(FetchFirst node, Scope scope)
@@ -4744,28 +4722,26 @@ class StatementAnalyzer
                 analysis.addCoercion(parameter, BIGINT, false);
                 return OptionalLong.empty();
             }
-            else {
-                // validate parameter index
-                analyzeExpression(parameter, scope);
-                Expression providedValue = analysis.getParameters().get(NodeRef.of(parameter));
-                Object value;
-                try {
-                    value = evaluateConstantExpression(
-                            providedValue,
-                            BIGINT,
-                            plannerContext,
-                            session,
-                            accessControl,
-                            analysis.getParameters());
-                }
-                catch (VerifyException e) {
-                    throw semanticException(INVALID_ARGUMENTS, parameter, "Non constant parameter value for %s: %s", context, providedValue);
-                }
-                if (value == null) {
-                    throw semanticException(INVALID_ARGUMENTS, parameter, "Parameter value provided for %s is NULL: %s", context, providedValue);
-                }
-                return OptionalLong.of((long) value);
+            // validate parameter index
+            analyzeExpression(parameter, scope);
+            Expression providedValue = analysis.getParameters().get(NodeRef.of(parameter));
+            Object value;
+            try {
+                value = evaluateConstantExpression(
+                        providedValue,
+                        BIGINT,
+                        plannerContext,
+                        session,
+                        accessControl,
+                        analysis.getParameters());
             }
+            catch (VerifyException e) {
+                throw semanticException(INVALID_ARGUMENTS, parameter, "Non constant parameter value for %s: %s", context, providedValue);
+            }
+            if (value == null) {
+                throw semanticException(INVALID_ARGUMENTS, parameter, "Parameter value provided for %s is NULL: %s", context, providedValue);
+            }
+            return OptionalLong.of((long) value);
         }
 
         private Scope createAndAssignScope(Node node, Optional<Scope> parentScope)

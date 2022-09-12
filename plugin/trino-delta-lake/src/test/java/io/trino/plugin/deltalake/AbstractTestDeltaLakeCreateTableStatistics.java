@@ -57,8 +57,6 @@ import static io.trino.spi.type.TimeZoneKey.UTC_KEY;
 import static io.trino.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS;
 import static io.trino.spi.type.VarcharType.createUnboundedVarcharType;
 import static io.trino.testing.TestingConnectorSession.SESSION;
-import static io.trino.testing.TestingSession.testSessionBuilder;
-import static io.trino.testing.assertions.Assert.assertEventually;
 import static io.trino.testing.sql.TestTable.randomTableSuffix;
 import static java.lang.Double.NEGATIVE_INFINITY;
 import static java.lang.Double.POSITIVE_INFINITY;
@@ -81,8 +79,9 @@ public abstract class AbstractTestDeltaLakeCreateTableStatistics
         this.bucketName = "delta-test-create-table-statistics-" + randomTableSuffix();
         HiveMinioDataLake hiveMinioDataLake = closeAfterClass(new HiveMinioDataLake(bucketName));
         hiveMinioDataLake.start();
-        ImmutableMap.Builder<String, String> queryRunnerProperties = ImmutableMap.builder();
-        queryRunnerProperties.putAll(additionalProperties());
+        ImmutableMap.Builder<String, String> queryRunnerProperties = ImmutableMap.<String, String>builder()
+                .put("delta.enable-non-concurrent-writes", "true")
+                .putAll(additionalProperties());
         return DeltaLakeQueryRunner.createS3DeltaLakeQueryRunner(
                 DELTA_CATALOG,
                 SCHEMA,
@@ -433,65 +432,27 @@ public abstract class AbstractTestDeltaLakeCreateTableStatistics
     }
 
     @Test
-    public void testMultiFileTable()
+    public void testMultiFileTableWithNaNValue()
             throws Exception
     {
-        DeltaLakeColumnHandle columnHandle = new DeltaLakeColumnHandle("name", createUnboundedVarcharType(), "name", createUnboundedVarcharType(), REGULAR);
-        Session session = testSessionBuilder()
-                .setCatalog(DELTA_CATALOG)
-                .setSystemProperty("scale_writers", "false")
-                .setSchema(SCHEMA)
-                .build();
+        String columnName = "key";
+        DeltaLakeColumnHandle columnHandle = new DeltaLakeColumnHandle(columnName, DoubleType.DOUBLE, columnName, DoubleType.DOUBLE, REGULAR);
         try (TestTable table = new TestTable(
-                "test_partitioned_table_",
+                "test_multi_file_table_nan_value_",
+                ImmutableList.of(columnName),
                 ImmutableList.of(),
-                ImmutableList.of(),
-                "SELECT name FROM tpch.tiny.nation UNION select name from tpch.tiny.customer",
-                session)) {
+                "SELECT IF(custkey = 1143, nan(), CAST(custkey AS double)) FROM tpch.tiny.customer")) {
+            assertUpdate("INSERT INTO %s SELECT CAST(nationkey AS double) FROM tpch.tiny.nation".formatted(table.getName()), 25);
             List<AddFileEntry> addFileEntries = getAddFileEntries(table.getName());
             assertThat(addFileEntries.size()).isGreaterThan(1);
 
             List<DeltaLakeFileStatistics> statistics = addFileEntries.stream().map(entry -> entry.getStats().get()).collect(toImmutableList());
 
-            List<Object> minValues = statistics.stream().map(stat -> stat.getMinColumnValue(columnHandle).get()).collect(toImmutableList());
-            List<Object> maxValues = statistics.stream().map(stat -> stat.getMaxColumnValue(columnHandle).get()).collect(toImmutableList());
-
-            // All values in the table are distinct, so the min and max values should all be different
-            assertEquals(minValues.size(), minValues.stream().distinct().count());
-            assertEquals(maxValues.size(), maxValues.stream().distinct().count());
+            assertEquals(statistics.stream().filter(stat -> stat.getMinColumnValue(columnHandle).isEmpty() && stat.getMaxColumnValue(columnHandle).isEmpty()).count(), 1);
+            assertEquals(
+                    statistics.stream().filter(stat -> stat.getMinColumnValue(columnHandle).isPresent() && stat.getMaxColumnValue(columnHandle).isPresent()).count(),
+                    statistics.size() - 1);
         }
-    }
-
-    @Test
-    public void testMultiFileTableWithNaNValue()
-            throws Exception
-    {
-        // assertEventually because sometimes write from tpch.tiny.orders creates one file only and the test requires at least two files
-        assertEventually(() -> {
-            String columnName = "orderkey";
-            DeltaLakeColumnHandle columnHandle = new DeltaLakeColumnHandle(columnName, DoubleType.DOUBLE, columnName, DoubleType.DOUBLE, REGULAR);
-            Session session = testSessionBuilder()
-                    .setCatalog(DELTA_CATALOG)
-                    .setSchema(SCHEMA)
-                    .setSystemProperty("scale_writers", "false")
-                    .build();
-            try (TestTable table = new TestTable(
-                    "test_partitioned_table_",
-                    ImmutableList.of(columnName),
-                    ImmutableList.of(),
-                    "SELECT IF(orderkey = 50597, nan(), CAST(orderkey AS double)) FROM tpch.tiny.orders",
-                    session)) {
-                List<AddFileEntry> addFileEntries = getAddFileEntries(table.getName());
-                assertThat(addFileEntries.size()).isGreaterThan(1);
-
-                List<DeltaLakeFileStatistics> statistics = addFileEntries.stream().map(entry -> entry.getStats().get()).collect(toImmutableList());
-
-                assertEquals(statistics.stream().filter(stat -> stat.getMinColumnValue(columnHandle).isEmpty() && stat.getMaxColumnValue(columnHandle).isEmpty()).count(), 1);
-                assertEquals(
-                        statistics.stream().filter(stat -> stat.getMinColumnValue(columnHandle).isPresent() && stat.getMaxColumnValue(columnHandle).isPresent()).count(),
-                        statistics.size() - 1);
-            }
-        });
     }
 
     protected class TestTable

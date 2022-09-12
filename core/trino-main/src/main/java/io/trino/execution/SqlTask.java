@@ -448,13 +448,12 @@ public class SqlTask
                             this::notifyStatusChanged);
                     taskHolderReference.compareAndSet(taskHolder, new TaskHolder(taskExecution));
                     needsPlan.set(false);
+                    taskExecution.start();
                 }
             }
 
-            if (taskExecution != null) {
-                taskExecution.addSplitAssignments(splitAssignments);
-                taskExecution.getTaskContext().addDynamicFilter(dynamicFilterDomains);
-            }
+            taskExecution.addSplitAssignments(splitAssignments);
+            taskExecution.getTaskContext().addDynamicFilter(dynamicFilterDomains);
         }
         catch (Error e) {
             failed(e);

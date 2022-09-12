@@ -39,6 +39,8 @@ public class IcebergConfig
 {
     public static final int FORMAT_VERSION_SUPPORT_MIN = 1;
     public static final int FORMAT_VERSION_SUPPORT_MAX = 2;
+    public static final String EXTENDED_STATISTICS_CONFIG = "iceberg.experimental.extended-statistics.enabled";
+    public static final String EXTENDED_STATISTICS_DESCRIPTION = "Allow ANALYZE and use of extended statistics collected by it. Currently, the statistics are collected in Trino-specific format";
     public static final String EXPIRE_SNAPSHOTS_MIN_RETENTION = "iceberg.expire_snapshots.min-retention";
     public static final String REMOVE_ORPHAN_FILES_MIN_RETENTION = "iceberg.remove_orphan_files.min-retention";
 
@@ -50,6 +52,7 @@ public class IcebergConfig
     private CatalogType catalogType = HIVE_METASTORE;
     private Duration dynamicFilteringWaitTimeout = new Duration(0, SECONDS);
     private boolean tableStatisticsEnabled = true;
+    private boolean extendedStatisticsEnabled;
     private boolean projectionPushdownEnabled = true;
     private Optional<String> hiveCatalogName = Optional.empty();
     private int formatVersion = FORMAT_VERSION_SUPPORT_MAX;
@@ -164,6 +167,11 @@ public class IcebergConfig
         return this;
     }
 
+    public boolean isTableStatisticsEnabled()
+    {
+        return tableStatisticsEnabled;
+    }
+
     // In case of some queries / tables, retrieving table statistics from Iceberg
     // can take 20+ seconds. This config allows the user / operator the option
     // to opt out of retrieving table statistics in those cases to speed up query planning.
@@ -175,9 +183,17 @@ public class IcebergConfig
         return this;
     }
 
-    public boolean isTableStatisticsEnabled()
+    public boolean isExtendedStatisticsEnabled()
     {
-        return tableStatisticsEnabled;
+        return extendedStatisticsEnabled;
+    }
+
+    @Config(EXTENDED_STATISTICS_CONFIG)
+    @ConfigDescription(EXTENDED_STATISTICS_DESCRIPTION)
+    public IcebergConfig setExtendedStatisticsEnabled(boolean extendedStatisticsEnabled)
+    {
+        this.extendedStatisticsEnabled = extendedStatisticsEnabled;
+        return this;
     }
 
     public boolean isProjectionPushdownEnabled()

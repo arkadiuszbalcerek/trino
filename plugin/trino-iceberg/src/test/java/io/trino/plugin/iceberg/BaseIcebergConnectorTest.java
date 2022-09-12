@@ -90,11 +90,13 @@ import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 import static io.trino.SystemSessionProperties.PREFERRED_WRITE_PARTITIONING_MIN_NUMBER_OF_PARTITIONS;
 import static io.trino.SystemSessionProperties.SCALE_WRITERS;
+import static io.trino.SystemSessionProperties.TASK_WRITER_COUNT;
 import static io.trino.plugin.hive.HiveTestUtils.HDFS_ENVIRONMENT;
 import static io.trino.plugin.iceberg.IcebergFileFormat.AVRO;
 import static io.trino.plugin.iceberg.IcebergFileFormat.ORC;
 import static io.trino.plugin.iceberg.IcebergFileFormat.PARQUET;
 import static io.trino.plugin.iceberg.IcebergQueryRunner.ICEBERG_CATALOG;
+import static io.trino.plugin.iceberg.IcebergSessionProperties.EXTENDED_STATISTICS_ENABLED;
 import static io.trino.plugin.iceberg.IcebergSplitManager.ICEBERG_DOMAIN_COMPACTION_THRESHOLD;
 import static io.trino.spi.predicate.Domain.multipleValues;
 import static io.trino.spi.predicate.Domain.singleValue;
@@ -2858,6 +2860,69 @@ public abstract class BaseIcebergConnectorTest
         dropTable(tableName);
     }
 
+    /**
+     * @see TestIcebergAnalyze
+     */
+    @Test
+    public void testBasicAnalyze()
+    {
+        Session defaultSession = getSession();
+        String catalog = defaultSession.getCatalog().orElseThrow();
+        Session extendedStatisticsEnabled = Session.builder(defaultSession)
+                .setCatalogSessionProperty(catalog, EXTENDED_STATISTICS_ENABLED, "true")
+                .build();
+        String tableName = "test_basic_analyze";
+
+        assertUpdate(defaultSession, "CREATE TABLE " + tableName + " AS SELECT * FROM tpch.tiny.region", 5);
+
+        String statsWithoutNdv = format == AVRO
+                ? ("VALUES " +
+                "  ('regionkey', NULL, NULL, NULL, NULL, NULL, NULL), " +
+                "  ('name', NULL, NULL, NULL, NULL, NULL, NULL), " +
+                "  ('comment', NULL, NULL, NULL, NULL, NULL, NULL), " +
+                "  (NULL, NULL, NULL, NULL, 5e0, NULL, NULL)")
+                : ("VALUES " +
+                "  ('regionkey', NULL, NULL, 0e0, NULL, '0', '4'), " +
+                "  ('name', " + (format == PARQUET ? "87e0" : "NULL") + ", NULL, 0e0, NULL, NULL, NULL), " +
+                "  ('comment', " + (format == PARQUET ? "237e0" : "NULL") + ", NULL, 0e0, NULL, NULL, NULL), " +
+                "  (NULL, NULL, NULL, NULL, 5e0, NULL, NULL)");
+
+        String statsWithNdv = format == AVRO
+                ? ("VALUES " +
+                "  ('regionkey', NULL, 5e0, NULL, NULL, NULL, NULL), " +
+                "  ('name', NULL, 5e0, NULL, NULL, NULL, NULL), " +
+                "  ('comment', NULL, 5e0, NULL, NULL, NULL, NULL), " +
+                "  (NULL, NULL, NULL, NULL, 5e0, NULL, NULL)")
+                : ("VALUES " +
+                "  ('regionkey', NULL, 5e0, 0e0, NULL, '0', '4'), " +
+                "  ('name', " + (format == PARQUET ? "87e0" : "NULL") + ", 5e0, 0e0, NULL, NULL, NULL), " +
+                "  ('comment', " + (format == PARQUET ? "237e0" : "NULL") + ", 5e0, 0e0, NULL, NULL, NULL), " +
+                "  (NULL, NULL, NULL, NULL, 5e0, NULL, NULL)");
+
+        // initially, no NDV information
+        assertThat(query(defaultSession, "SHOW STATS FOR " + tableName)).skippingTypesCheck().matches(statsWithoutNdv);
+        assertThat(query(extendedStatisticsEnabled, "SHOW STATS FOR " + tableName)).skippingTypesCheck().matches(statsWithoutNdv);
+
+        // ANALYZE needs to be enabled. This is because it currently stores additional statistics in a Trino-specific format and the format will change.
+        assertQueryFails(
+                defaultSession,
+                "ANALYZE " + tableName,
+                "\\QAnalyze is not enabled. You can enable analyze using iceberg.experimental.extended-statistics.enabled config or experimental_extended_statistics_enabled catalog session property");
+
+        // ANALYZE the table
+        assertUpdate(extendedStatisticsEnabled, "ANALYZE " + tableName);
+        // After ANALYZE, NDV information present
+        assertThat(query(extendedStatisticsEnabled, "SHOW STATS FOR " + tableName))
+                .skippingTypesCheck()
+                .matches(statsWithNdv);
+        // NDV information is not present in a session with extended statistics not enabled
+        assertThat(query(defaultSession, "SHOW STATS FOR " + tableName))
+                .skippingTypesCheck()
+                .matches(statsWithoutNdv);
+
+        assertUpdate("DROP TABLE " + tableName);
+    }
+
     @Test
     public void testMultipleColumnTableStatistics()
     {
@@ -5311,6 +5376,24 @@ public abstract class BaseIcebergConnectorTest
         assertUpdate(format("INSERT INTO %s VALUES (1, row(11))", tableName), 1);
         assertThat(query(format("SELECT * FROM %s", tableName)))
                 .matches("VALUES (INTEGER '1', CAST(ROW(11) AS ROW(\"another identifier\"INTEGER)))");
+        assertUpdate("DROP TABLE " + tableName);
+    }
+
+    @Test
+    public void testInsertIntoBucketedColumnTaskWriterCount()
+    {
+        int taskWriterCount = 4;
+        assertThat(taskWriterCount).isGreaterThan(getQueryRunner().getNodeCount());
+        Session session = Session.builder(getSession())
+                .setSystemProperty(TASK_WRITER_COUNT, String.valueOf(taskWriterCount))
+                .build();
+
+        String tableName = "test_inserting_into_bucketed_column_task_writer_count_" + randomTableSuffix();
+        assertUpdate("CREATE TABLE " + tableName + " (x INT) WITH (partitioning = ARRAY['bucket(x, 7)'])");
+
+        assertUpdate(session, "INSERT INTO " + tableName + " SELECT nationkey FROM nation", 25);
+        assertQuery("SELECT * FROM " + tableName, "SELECT nationkey FROM nation");
+
         assertUpdate("DROP TABLE " + tableName);
     }
 

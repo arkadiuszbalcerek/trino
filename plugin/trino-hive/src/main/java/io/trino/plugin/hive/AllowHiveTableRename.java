@@ -11,22 +11,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.trino.plugin.pinot;
+package io.trino.plugin.hive;
 
-import static io.trino.plugin.pinot.TestingPinotCluster.PINOT_LATEST_IMAGE_NAME;
+import javax.inject.Qualifier;
 
-public class TestPinotWithoutAuthenticationIntegrationSmokeTestLatestVersion
-        extends AbstractPinotIntegrationSmokeTest
-{
-    @Override
-    protected boolean isSecured()
-    {
-        return false;
-    }
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
-    @Override
-    protected String getPinotImageName()
-    {
-        return PINOT_LATEST_IMAGE_NAME;
-    }
-}
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Retention(RUNTIME)
+@Target({FIELD, PARAMETER, METHOD})
+@Qualifier
+public @interface AllowHiveTableRename {}
