@@ -38,8 +38,8 @@
             <artifactId>http-client</artifactId>
             <exclusions>
                 <exclusion>
-                    <artifactId>node</artifactId>
                     <groupId>io.airlift</groupId>
+                    <artifactId>node</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
