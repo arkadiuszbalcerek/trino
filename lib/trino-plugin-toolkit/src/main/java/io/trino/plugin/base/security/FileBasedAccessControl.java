@@ -91,7 +91,6 @@ import static io.trino.spi.security.AccessDeniedException.denyShowCreateTable;
 import static io.trino.spi.security.AccessDeniedException.denyShowTables;
 import static io.trino.spi.security.AccessDeniedException.denyTruncateTable;
 import static io.trino.spi.security.AccessDeniedException.denyUpdateTableColumns;
-import static java.util.Objects.requireNonNull;
 
 public class FileBasedAccessControl
         implements ConnectorAccessControl
@@ -106,7 +105,7 @@ public class FileBasedAccessControl
 
     public FileBasedAccessControl(CatalogName catalogName, Supplier<AccessControlRules> rulesProvider)
     {
-        this.catalogName = requireNonNull(catalogName, "catalogName is null").toString();
+        this.catalogName = catalogName.toString();
 
         AccessControlRules rules = rulesProvider.get();
         checkArgument(!rules.hasRoleRules(), "File connector access control does not support role rules!");
