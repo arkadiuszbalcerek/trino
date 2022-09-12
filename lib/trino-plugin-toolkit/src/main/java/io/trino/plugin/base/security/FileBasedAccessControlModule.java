@@ -47,7 +47,7 @@ public class FileBasedAccessControlModule
     private void bindRules(Binder binder)
     {
         FileBasedAccessControlConfig configuration = buildConfigObject(FileBasedAccessControlConfig.class);
-        if (FileBasedAccessControlUtils.isRest(configuration)) {
+        if (configuration.isRest()) {
             binder.bind(new TypeLiteral<Supplier<AccessControlRules>>() {})
                     .to(RestFileBasedAccessControlRulesProvider.class)
                     .in(Scopes.SINGLETON);

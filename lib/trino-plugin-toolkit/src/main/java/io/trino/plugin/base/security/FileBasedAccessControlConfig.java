@@ -69,4 +69,9 @@ public class FileBasedAccessControlConfig
         this.refreshPeriod = refreshPeriod;
         return this;
     }
+
+    public boolean isRest()
+    {
+        return getConfigFilePath().startsWith("https://") || getConfigFilePath().startsWith("http://");
+    }
 }

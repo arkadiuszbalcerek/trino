@@ -22,11 +22,6 @@ public final class FileBasedAccessControlUtils
     {
     }
 
-    public static boolean isRest(FileBasedAccessControlConfig config)
-    {
-        return config.getConfigFilePath().startsWith("https://") || config.getConfigFilePath().startsWith("http://");
-    }
-
     public static <R> R parseJSONString(String jsonString, String jsonPointer, Class<R> clazz)
     {
         JsonNode node = JsonUtils.parseJson(jsonString, JsonNode.class);
