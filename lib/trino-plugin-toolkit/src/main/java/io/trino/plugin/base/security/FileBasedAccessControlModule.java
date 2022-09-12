@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import static com.google.common.base.Suppliers.memoizeWithExpiration;
+import static io.airlift.configuration.ConditionalModule.conditionalModule;
 import static io.airlift.configuration.ConfigBinder.configBinder;
 import static io.airlift.http.client.HttpClientBinder.httpClientBinder;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -47,21 +48,27 @@ public class FileBasedAccessControlModule
     private void bindRules(Binder binder)
     {
         FileBasedAccessControlConfig configuration = buildConfigObject(FileBasedAccessControlConfig.class);
-        if (configuration.isRest()) {
-            binder.bind(new TypeLiteral<Supplier<AccessControlRules>>() {})
-                    .to(RestFileBasedAccessControlRulesProvider.class)
-                    .in(Scopes.SINGLETON);
-            httpClientBinder(binder).bindHttpClient("security-http-client", ForAccessControlRules.class)
-                    .withConfigDefaults(config -> config
-                            .setRequestTimeout(Duration.succinctDuration(10, TimeUnit.SECONDS))
-                            .setSelectorCount(1)
-                            .setMinThreads(1));
-        }
-        else {
-            binder.bind(new TypeLiteral<Supplier<AccessControlRules>>() {})
-                    .toProvider(() -> new LocalFileAccessControlRulesProvider<>(configuration, AccessControlRules.class))
-                    .in(Scopes.SINGLETON);
-        }
+        install(conditionalModule(
+                FileBasedAccessControlConfig.class,
+                config -> config.isRest(),
+                innerBinder -> {
+                    innerBinder.bind(new TypeLiteral<Supplier<AccessControlRules>>() {})
+                            .to(RestFileBasedAccessControlRulesProvider.class)
+                            .in(Scopes.SINGLETON);
+                    httpClientBinder(innerBinder).bindHttpClient("security-http-client", ForAccessControlRules.class)
+                            .withConfigDefaults(config -> config
+                                    .setRequestTimeout(Duration.succinctDuration(10, TimeUnit.SECONDS))
+                                    .setSelectorCount(1)
+                                    .setMinThreads(1));
+                }));
+        install(conditionalModule(
+                FileBasedAccessControlConfig.class,
+                config -> !config.isRest(),
+                innerBinder -> {
+                    innerBinder.bind(new TypeLiteral<Supplier<AccessControlRules>>() {})
+                            .toProvider(() -> new LocalFileAccessControlRulesProvider<>(configuration, AccessControlRules.class))
+                            .in(Scopes.SINGLETON);
+                }));
     }
 
     @Inject
