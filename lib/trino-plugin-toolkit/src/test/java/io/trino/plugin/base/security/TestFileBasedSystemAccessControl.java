@@ -46,8 +46,8 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import static com.google.common.io.Files.copy;
-import static io.trino.plugin.base.security.FileBasedAccessControlConfig.SECURITY_CONFIG_FILE;
-import static io.trino.plugin.base.security.FileBasedAccessControlConfig.SECURITY_REFRESH_PERIOD;
+import static io.trino.plugin.base.security.BaseAccessControlConfig.SECURITY_CONFIG_FILE;
+import static io.trino.plugin.base.security.BaseAccessControlConfig.SECURITY_REFRESH_PERIOD;
 import static io.trino.spi.function.FunctionKind.AGGREGATE;
 import static io.trino.spi.function.FunctionKind.SCALAR;
 import static io.trino.spi.function.FunctionKind.TABLE;

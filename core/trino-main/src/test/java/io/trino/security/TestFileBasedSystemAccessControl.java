@@ -15,6 +15,7 @@ package io.trino.security;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.inject.ProvisionException;
 import io.trino.metadata.QualifiedObjectName;
 import io.trino.plugin.base.security.DefaultSystemAccessControl;
 import io.trino.plugin.base.security.FileBasedSystemAccessControl;
@@ -38,8 +39,8 @@ import java.util.Set;
 
 import static com.google.common.io.Files.copy;
 import static com.google.common.io.Resources.getResource;
-import static io.trino.plugin.base.security.FileBasedAccessControlConfig.SECURITY_CONFIG_FILE;
-import static io.trino.plugin.base.security.FileBasedAccessControlConfig.SECURITY_REFRESH_PERIOD;
+import static io.trino.plugin.base.security.LocalFileBasedAccessControlConfig.SECURITY_CONFIG_FILE;
+import static io.trino.plugin.base.security.LocalFileBasedAccessControlConfig.SECURITY_REFRESH_PERIOD;
 import static io.trino.spi.security.PrincipalType.USER;
 import static io.trino.spi.security.Privilege.SELECT;
 import static io.trino.testing.TestingEventListenerManager.emptyEventListenerManager;
@@ -796,14 +797,14 @@ public class TestFileBasedSystemAccessControl
                 .execute(transactionId -> {
                     accessControlManager.checkCanCreateView(new SecurityContext(transactionId, alice, queryId), aliceView);
                 }))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(RuntimeException.class)
                 .hasMessageStartingWith("Invalid JSON file");
         // test if file based cached control was not cached somewhere
         assertThatThrownBy(() -> transaction(transactionManager, accessControlManager)
                 .execute(transactionId -> {
                     accessControlManager.checkCanCreateView(new SecurityContext(transactionId, alice, queryId), aliceView);
                 }))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(RuntimeException.class)
                 .hasMessageStartingWith("Invalid JSON file");
 
         copy(new File(getResourcePath("catalog.json")), configFile);
@@ -819,16 +820,16 @@ public class TestFileBasedSystemAccessControl
     public void testAllowModeIsRequired()
     {
         assertThatThrownBy(() -> newAccessControlManager(createTestTransactionManager(), "catalog_allow_unset.json"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("Invalid JSON file");
+                .isInstanceOf(ProvisionException.class)
+                .hasMessageContaining("Invalid JSON file");
     }
 
     @Test
     public void testAllowModeInvalidValue()
     {
         assertThatThrownBy(() -> newAccessControlManager(createTestTransactionManager(), "catalog_invalid_allow_value.json"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("Invalid JSON file");
+                .isInstanceOf(ProvisionException.class)
+                .hasMessageContaining("Invalid JSON file");
     }
 
     private AccessControlManager newAccessControlManager(TransactionManager transactionManager, String resourceName)
@@ -854,7 +855,7 @@ public class TestFileBasedSystemAccessControl
     public void parseUnknownRules()
     {
         assertThatThrownBy(() -> parse("src/test/resources/security-config-file-with-unknown-rules.json"))
-                .hasMessageContaining("Invalid JSON");
+                .hasMessageContaining("Invalid JSON file");
     }
 
     private void parse(String path)

@@ -66,11 +66,12 @@ public class AtopConnectorFactory
                     new ConnectorAccessControlModule(),
                     conditionalModule(
                             AtopConnectorConfig.class,
-                            config -> config.getSecurity() == AtopSecurity.FILE,
-                            binder -> {
-                                binder.install(new FileBasedAccessControlModule());
-                                binder.install(new JsonModule());
-                            }));
+                            AtopConnectorFactory::isFileBasedSecurity,
+                            new FileBasedAccessControlModule()),
+                    conditionalModule(
+                            AtopConnectorConfig.class,
+                            AtopConnectorFactory::isFileBasedSecurity,
+                            new JsonModule()));
 
             Injector injector = app
                     .doNotInitializeLogging()
@@ -79,5 +80,10 @@ public class AtopConnectorFactory
 
             return injector.getInstance(AtopConnector.class);
         }
+    }
+
+    private static boolean isFileBasedSecurity(AtopConnectorConfig config)
+    {
+        return config.getSecurity() == AtopSecurity.FILE;
     }
 }

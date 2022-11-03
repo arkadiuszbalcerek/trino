@@ -34,7 +34,6 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.File;
-import java.net.URISyntaxException;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +42,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import static com.google.common.io.Resources.getResource;
+import static io.trino.plugin.base.util.JsonUtils.parseJson;
 import static io.trino.spi.function.FunctionKind.AGGREGATE;
 import static io.trino.spi.function.FunctionKind.SCALAR;
 import static io.trino.spi.function.FunctionKind.TABLE;
@@ -53,7 +53,7 @@ import static io.trino.spi.type.VarcharType.VARCHAR;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.testng.Assert.assertEquals;
 
-public class TestFileBasedAccessControl
+public class TestRulesBasedAccessControl
 {
     private static final ConnectorSecurityContext ADMIN = user("admin", ImmutableSet.of("admin", "staff"));
     private static final ConnectorSecurityContext ALICE = user("alice", ImmutableSet.of("staff"));
@@ -535,6 +535,7 @@ public class TestFileBasedAccessControl
     {
         assertThatThrownBy(() -> createAccessControl("invalid.json"))
                 .hasMessageContaining("Invalid JSON");
+        //.hasMessageContaining("Failed to convert JSON tree node");
     }
 
     @Test
@@ -634,7 +635,7 @@ public class TestFileBasedAccessControl
     public void testEverythingImplemented()
             throws NoSuchMethodException
     {
-        assertAllMethodsOverridden(ConnectorAccessControl.class, FileBasedAccessControl.class);
+        assertAllMethodsOverridden(ConnectorAccessControl.class, RulesBasedAccessControl.class);
     }
 
     private static ConnectorSecurityContext user(String name, Set<String> groups)
@@ -647,13 +648,9 @@ public class TestFileBasedAccessControl
 
     private static ConnectorAccessControl createAccessControl(String fileName)
     {
-        try {
-            File configFile = new File(getResource(fileName).toURI());
-            return new FileBasedAccessControl(new CatalogName("test_catalog"), configFile);
-        }
-        catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
+        File configFile = new File(getResource(fileName).getPath());
+        AccessControlRules controlRules = parseJson(configFile.toPath(), AccessControlRules.class);
+        return new RulesBasedAccessControl(new CatalogName("test_catalog"), controlRules);
     }
 
     private static void assertDenied(ThrowingRunnable runnable)

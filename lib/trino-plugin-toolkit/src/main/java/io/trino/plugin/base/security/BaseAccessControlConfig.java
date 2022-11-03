@@ -14,35 +14,18 @@
 package io.trino.plugin.base.security;
 
 import io.airlift.configuration.Config;
-import io.airlift.configuration.validation.FileExists;
+import io.airlift.configuration.ConfigDescription;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
 
-import javax.validation.constraints.NotNull;
-
-import java.io.File;
-
-public class FileBasedAccessControlConfig
+public class BaseAccessControlConfig
 {
     public static final String SECURITY_CONFIG_FILE = "security.config-file";
     public static final String SECURITY_REFRESH_PERIOD = "security.refresh-period";
+    public static final String SECURITY_REST_FLAG = "security.rest";
 
-    private File configFile;
+    private boolean rest;
     private Duration refreshPeriod;
-
-    @NotNull
-    @FileExists
-    public File getConfigFile()
-    {
-        return configFile;
-    }
-
-    @Config(SECURITY_CONFIG_FILE)
-    public FileBasedAccessControlConfig setConfigFile(File configFile)
-    {
-        this.configFile = configFile;
-        return this;
-    }
 
     @MinDuration("1ms")
     public Duration getRefreshPeriod()
@@ -51,9 +34,22 @@ public class FileBasedAccessControlConfig
     }
 
     @Config(SECURITY_REFRESH_PERIOD)
-    public FileBasedAccessControlConfig setRefreshPeriod(Duration refreshPeriod)
+    public BaseAccessControlConfig setRefreshPeriod(Duration refreshPeriod)
     {
         this.refreshPeriod = refreshPeriod;
+        return this;
+    }
+
+    public boolean isRest()
+    {
+        return rest;
+    }
+
+    @Config(SECURITY_REST_FLAG)
+    @ConfigDescription("Flag specifying if the config should be fetched from local file or REST endpoint.")
+    public BaseAccessControlConfig setRest(boolean rest)
+    {
+        this.rest = rest;
         return this;
     }
 }

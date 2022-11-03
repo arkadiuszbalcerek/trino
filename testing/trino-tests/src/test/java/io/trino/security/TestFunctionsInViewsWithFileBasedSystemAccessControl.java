@@ -32,7 +32,7 @@ import org.testng.annotations.Test;
 import java.util.Optional;
 
 import static com.google.common.io.Resources.getResource;
-import static io.trino.plugin.base.security.FileBasedAccessControlConfig.SECURITY_CONFIG_FILE;
+import static io.trino.plugin.base.security.BaseAccessControlConfig.SECURITY_CONFIG_FILE;
 import static io.trino.testing.TestingSession.testSessionBuilder;
 
 public class TestFunctionsInViewsWithFileBasedSystemAccessControl

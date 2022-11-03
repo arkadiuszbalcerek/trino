@@ -15,23 +15,32 @@ package io.trino.plugin.base.security;
 
 import com.google.inject.Binder;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
+import io.airlift.configuration.ConfigurationFactory;
+
+import java.util.Map;
 
 import static io.airlift.configuration.ConditionalModule.conditionalModule;
 
-public class FileBasedAccessControlModule
+public class FileBasedSystemAccessControlModule
         extends AbstractConfigurationAwareModule
 {
+    public FileBasedSystemAccessControlModule(Map<String, String> config)
+    {
+        super();
+        this.setConfigurationFactory(new ConfigurationFactory(config));
+    }
+
     @Override
     public void setup(Binder binder)
     {
         install(conditionalModule(
                 BaseAccessControlConfig.class,
                 config -> config.isRest(),
-                new RestBasedAccessControlModule()));
+                new RestBasedSystemAccessControlModule()));
 
         install(conditionalModule(
                 BaseAccessControlConfig.class,
                 config -> !config.isRest(),
-                new LocalFileBasedAccessControlModule()));
+                new LocalFileBasedSystemAccessControlModule()));
     }
 }
