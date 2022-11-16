@@ -28,24 +28,22 @@ import java.util.concurrent.TimeUnit;
 import static io.airlift.configuration.testing.ConfigAssertions.assertFullMapping;
 import static io.airlift.configuration.testing.ConfigAssertions.assertRecordedDefaults;
 import static io.airlift.configuration.testing.ConfigAssertions.recordDefaults;
-import static io.trino.plugin.base.security.LocalFileBasedAccessControlConfig.SECURITY_CONFIG_FILE;
-import static io.trino.plugin.base.security.LocalFileBasedAccessControlConfig.SECURITY_REFRESH_PERIOD;
-import static io.trino.plugin.base.security.LocalFileBasedAccessControlConfig.SECURITY_REST_FLAG;
+import static io.trino.plugin.base.security.FileBasedAccessControlConfig.SECURITY_CONFIG_FILE;
+import static io.trino.plugin.base.security.FileBasedAccessControlConfig.SECURITY_REFRESH_PERIOD;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-public class TestLocalFileBasedAccessControlConfig
+public class TestFileBasedAccessControlConfig
 {
     @Test
     public void testDefaults()
     {
-        assertRecordedDefaults(recordDefaults(LocalFileBasedAccessControlConfig.class)
+        assertRecordedDefaults(recordDefaults(FileBasedAccessControlConfig.class)
                 .setConfigFile(null)
-                .setRefreshPeriod(null)
-                .setRest(false));
+                .setRefreshPeriod(null));
     }
 
     @Test
-    public void testExplicitPropertyMappingsWithLocalFile()
+    public void testExplicitPropertyMappings()
             throws IOException
     {
         Path securityConfigFile = Files.createTempFile(null, null);
@@ -53,13 +51,11 @@ public class TestLocalFileBasedAccessControlConfig
         Map<String, String> properties = ImmutableMap.<String, String>builder()
                 .put(SECURITY_CONFIG_FILE, securityConfigFile.toString())
                 .put(SECURITY_REFRESH_PERIOD, "1s")
-                .put(SECURITY_REST_FLAG, "true")
                 .buildOrThrow();
 
-        LocalFileBasedAccessControlConfig expected = (LocalFileBasedAccessControlConfig) new LocalFileBasedAccessControlConfig()
+        FileBasedAccessControlConfig expected = new FileBasedAccessControlConfig()
                 .setConfigFile(securityConfigFile.toFile())
-                .setRefreshPeriod(new Duration(1, TimeUnit.SECONDS))
-                .setRest(true);
+                .setRefreshPeriod(new Duration(1, TimeUnit.SECONDS));
 
         assertFullMapping(properties, expected);
     }
@@ -83,9 +79,9 @@ public class TestLocalFileBasedAccessControlConfig
         newInstance(ImmutableMap.of(SECURITY_CONFIG_FILE, securityConfigFile.toString()));
     }
 
-    private static LocalFileBasedAccessControlConfig newInstance(Map<String, String> properties)
+    private static FileBasedAccessControlConfig newInstance(Map<String, String> properties)
     {
         ConfigurationFactory configurationFactory = new ConfigurationFactory(properties);
-        return configurationFactory.build(LocalFileBasedAccessControlConfig.class);
+        return configurationFactory.build(FileBasedAccessControlConfig.class);
     }
 }

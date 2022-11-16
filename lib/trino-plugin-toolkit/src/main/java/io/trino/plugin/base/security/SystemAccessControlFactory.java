@@ -25,9 +25,9 @@ import static java.util.Objects.requireNonNull;
 
 public class SystemAccessControlFactory
 {
-    private final FileBasedSystemAccessControlRules rules;
+    private final SystemAccessControlRules rules;
 
-    public SystemAccessControlFactory(final FileBasedSystemAccessControlRules rules)
+    public SystemAccessControlFactory(final SystemAccessControlRules rules)
     {
         this.rules = requireNonNull(rules);
     }
@@ -53,7 +53,7 @@ public class SystemAccessControlFactory
             // if no rules are defined then all access is allowed
             catalogAccessControlRules = ImmutableList.of(CatalogAccessControlRule.ALLOW_ALL);
         }
-        return FileBasedSystemAccessControl.builder()
+        return RuleBasedSystemAccessControl.builder()
                 .setCatalogRules(catalogAccessControlRules)
                 .setQueryAccessRules(rules.getQueryAccessRules())
                 .setImpersonationRules(rules.getImpersonationRules())

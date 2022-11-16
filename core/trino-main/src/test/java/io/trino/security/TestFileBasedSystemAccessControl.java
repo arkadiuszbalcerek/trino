@@ -18,7 +18,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.ProvisionException;
 import io.trino.metadata.QualifiedObjectName;
 import io.trino.plugin.base.security.DefaultSystemAccessControl;
-import io.trino.plugin.base.security.FileBasedSystemAccessControl;
+import io.trino.plugin.base.security.FileBasedSystemAccessControlFactory;
 import io.trino.spi.QueryId;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.CatalogSchemaName;
@@ -39,8 +39,8 @@ import java.util.Set;
 
 import static com.google.common.io.Files.copy;
 import static com.google.common.io.Resources.getResource;
-import static io.trino.plugin.base.security.LocalFileBasedAccessControlConfig.SECURITY_CONFIG_FILE;
-import static io.trino.plugin.base.security.LocalFileBasedAccessControlConfig.SECURITY_REFRESH_PERIOD;
+import static io.trino.plugin.base.security.FileBasedAccessControlConfig.SECURITY_CONFIG_FILE;
+import static io.trino.plugin.base.security.FileBasedAccessControlConfig.SECURITY_REFRESH_PERIOD;
 import static io.trino.spi.security.PrincipalType.USER;
 import static io.trino.spi.security.Privilege.SELECT;
 import static io.trino.testing.TestingEventListenerManager.emptyEventListenerManager;
@@ -134,7 +134,7 @@ public class TestFileBasedSystemAccessControl
         TransactionManager transactionManager = createTestTransactionManager();
         AccessControlManager accessControlManager = new AccessControlManager(transactionManager, emptyEventListenerManager(), new AccessControlConfig(), DefaultSystemAccessControl.NAME);
         accessControlManager.loadSystemAccessControl(
-                FileBasedSystemAccessControl.NAME,
+                FileBasedSystemAccessControlFactory.NAME,
                 ImmutableMap.of("security.config-file", new File("../../docs/src/main/sphinx/security/user-impersonation.json").getAbsolutePath()));
 
         accessControlManager.checkCanImpersonateUser(admin, "charlie");
@@ -779,7 +779,7 @@ public class TestFileBasedSystemAccessControl
         configFile.deleteOnExit();
         copy(new File(getResourcePath("catalog.json")), configFile);
 
-        accessControlManager.loadSystemAccessControl(FileBasedSystemAccessControl.NAME, ImmutableMap.of(
+        accessControlManager.loadSystemAccessControl(FileBasedSystemAccessControlFactory.NAME, ImmutableMap.of(
                 SECURITY_CONFIG_FILE, configFile.getAbsolutePath(),
                 SECURITY_REFRESH_PERIOD, "1ms"));
 
@@ -797,14 +797,14 @@ public class TestFileBasedSystemAccessControl
                 .execute(transactionId -> {
                     accessControlManager.checkCanCreateView(new SecurityContext(transactionId, alice, queryId), aliceView);
                 }))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageStartingWith("Invalid JSON file");
         // test if file based cached control was not cached somewhere
         assertThatThrownBy(() -> transaction(transactionManager, accessControlManager)
                 .execute(transactionId -> {
                     accessControlManager.checkCanCreateView(new SecurityContext(transactionId, alice, queryId), aliceView);
                 }))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageStartingWith("Invalid JSON file");
 
         copy(new File(getResourcePath("catalog.json")), configFile);
@@ -836,7 +836,7 @@ public class TestFileBasedSystemAccessControl
     {
         AccessControlManager accessControlManager = new AccessControlManager(transactionManager, emptyEventListenerManager(), new AccessControlConfig(), DefaultSystemAccessControl.NAME);
 
-        accessControlManager.loadSystemAccessControl(FileBasedSystemAccessControl.NAME, ImmutableMap.of("security.config-file", getResourcePath(resourceName)));
+        accessControlManager.loadSystemAccessControl(FileBasedSystemAccessControlFactory.NAME, ImmutableMap.of("security.config-file", getResourcePath(resourceName)));
 
         return accessControlManager;
     }
@@ -860,6 +860,6 @@ public class TestFileBasedSystemAccessControl
 
     private void parse(String path)
     {
-        new FileBasedSystemAccessControl.Factory().create(ImmutableMap.of(SECURITY_CONFIG_FILE, path));
+        new FileBasedSystemAccessControlFactory().create(ImmutableMap.of(SECURITY_CONFIG_FILE, path));
     }
 }

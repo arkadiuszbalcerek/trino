@@ -16,7 +16,6 @@ package io.trino.plugin.base.security;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import io.trino.plugin.base.CatalogName;
 import io.trino.spi.QueryId;
 import io.trino.spi.connector.ConnectorAccessControl;
 import io.trino.spi.connector.ConnectorSecurityContext;
@@ -33,7 +32,6 @@ import org.testng.Assert.ThrowingRunnable;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import java.io.File;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -41,8 +39,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import static com.google.common.io.Resources.getResource;
-import static io.trino.plugin.base.util.JsonUtils.parseJson;
 import static io.trino.spi.function.FunctionKind.AGGREGATE;
 import static io.trino.spi.function.FunctionKind.SCALAR;
 import static io.trino.spi.function.FunctionKind.TABLE;
@@ -53,7 +49,7 @@ import static io.trino.spi.type.VarcharType.VARCHAR;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.testng.Assert.assertEquals;
 
-public class TestRulesBasedAccessControl
+public abstract class AccessControlBaseTest
 {
     private static final ConnectorSecurityContext ADMIN = user("admin", ImmutableSet.of("admin", "staff"));
     private static final ConnectorSecurityContext ALICE = user("alice", ImmutableSet.of("staff"));
@@ -531,14 +527,6 @@ public class TestRulesBasedAccessControl
     }
 
     @Test
-    public void testInvalidRules()
-    {
-        assertThatThrownBy(() -> createAccessControl("invalid.json"))
-                .hasMessageContaining("Invalid JSON");
-        //.hasMessageContaining("Failed to convert JSON tree node");
-    }
-
-    @Test
     public void testFilterSchemas()
     {
         ConnectorAccessControl accessControl = createAccessControl("visibility.json");
@@ -646,12 +634,7 @@ public class TestRulesBasedAccessControl
                 new QueryId("query_id"));
     }
 
-    private static ConnectorAccessControl createAccessControl(String fileName)
-    {
-        File configFile = new File(getResource(fileName).getPath());
-        AccessControlRules controlRules = parseJson(configFile.toPath(), AccessControlRules.class);
-        return new RulesBasedAccessControl(new CatalogName("test_catalog"), controlRules);
-    }
+    protected abstract ConnectorAccessControl createAccessControl(String fileName);
 
     private static void assertDenied(ThrowingRunnable runnable)
     {

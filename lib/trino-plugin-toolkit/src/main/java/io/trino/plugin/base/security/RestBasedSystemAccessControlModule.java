@@ -15,17 +15,12 @@ package io.trino.plugin.base.security;
 
 import com.google.inject.Binder;
 import com.google.inject.Inject;
+import com.google.inject.Module;
 import com.google.inject.Provides;
-import io.airlift.configuration.AbstractConfigurationAwareModule;
-import io.airlift.configuration.ConfigurationFactory;
-import io.airlift.http.client.HttpClient;
-import io.airlift.http.client.HttpClientConfig;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.trino.spi.security.SystemAccessControl;
 
-import java.net.URI;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Suppliers.memoizeWithExpiration;
@@ -34,24 +29,13 @@ import static io.airlift.http.client.HttpClientBinder.httpClientBinder;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public class RestBasedSystemAccessControlModule
-        extends AbstractConfigurationAwareModule
+        implements Module
 {
     private static final Logger log = Logger.get(RestBasedSystemAccessControlModule.class);
-    private static final String HTTP_CLIENT_NAME = "access-control";
-
-    public RestBasedSystemAccessControlModule()
-    {
-        super();
-    }
-
-    public RestBasedSystemAccessControlModule(Map<String, String> config)
-    {
-        super();
-        this.setConfigurationFactory(new ConfigurationFactory(config));
-    }
+    private static final String HTTP_CLIENT_NAME = "system-access-control";
 
     @Override
-    public void setup(Binder binder)
+    public void configure(Binder binder)
     {
         configBinder(binder).bindConfig(RestBasedAccessControlConfig.class);
         httpClientBinder(binder).bindHttpClient(HTTP_CLIENT_NAME, ForAccessControlRules.class)
@@ -59,34 +43,29 @@ public class RestBasedSystemAccessControlModule
                         .setRequestTimeout(Duration.succinctDuration(10, TimeUnit.SECONDS))
                         .setSelectorCount(1)
                         .setMinThreads(1));
-        configBinder(binder).bindConfig(HttpClientConfig.class, HTTP_CLIENT_NAME);
+        binder.bind(AccessControlRulesRestExtractor.class);
     }
 
     @Inject
     @Provides
     public SystemAccessControl getSystemAccessControl(RestBasedAccessControlConfig config,
-                                                      @ForAccessControlRules HttpClient httpClient)
+                                                      AccessControlRulesRestExtractor rulesRestExtractor)
     {
-        String restUrl = config.getRestUrl();
-        URI configUri = URI.create(restUrl);
-
         if (config.getRefreshPeriod() != null) {
             return ForwardingSystemAccessControl.of(memoizeWithExpiration(
                 () -> {
-                    log.info("Refreshing system access control from %s", restUrl);
-                    return create(httpClient, configUri, config.getJsonPointer());
+                    log.info("Refreshing system access control from %s", config.getRestUrl());
+                    return create(rulesRestExtractor);
                 },
                 config.getRefreshPeriod().toMillis(),
                 MILLISECONDS));
         }
-        return create(httpClient, configUri, config.getJsonPointer());
+        return create(rulesRestExtractor);
     }
 
-    private SystemAccessControl create(HttpClient httpClient, URI configUri, String jsonPointer)
+    private SystemAccessControl create(AccessControlRulesRestExtractor rulesRestExtractor)
     {
-        AccessControlRulesRestExtractor<FileBasedSystemAccessControlRules> rulesRestExtractor = new AccessControlRulesRestExtractor<>(
-                httpClient, configUri, jsonPointer, FileBasedSystemAccessControlRules.class);
-        FileBasedSystemAccessControlRules rules = rulesRestExtractor.extract();
+        SystemAccessControlRules rules = rulesRestExtractor.extract(SystemAccessControlRules.class);
         return new SystemAccessControlFactory(rules).create();
     }
 }

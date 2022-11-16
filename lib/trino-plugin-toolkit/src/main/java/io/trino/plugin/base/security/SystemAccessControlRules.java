@@ -20,7 +20,7 @@ import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Optional;
 
-public class FileBasedSystemAccessControlRules
+public class SystemAccessControlRules
 {
     private final Optional<List<CatalogAccessControlRule>> catalogRules;
     private final Optional<List<QueryAccessRule>> queryAccessRules;
@@ -34,7 +34,7 @@ public class FileBasedSystemAccessControlRules
     private final Optional<List<CatalogFunctionAccessControlRule>> functionRules;
 
     @JsonCreator
-    public FileBasedSystemAccessControlRules(
+    public SystemAccessControlRules(
             @JsonProperty("catalogs") Optional<List<CatalogAccessControlRule>> catalogRules,
             @JsonProperty("queries") Optional<List<QueryAccessRule>> queryAccessRules,
             @JsonProperty("impersonation") Optional<List<ImpersonationRule>> impersonationRules,

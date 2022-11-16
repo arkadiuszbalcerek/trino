@@ -32,10 +32,11 @@ Configuration
     :ref:`rule <system-file-function-rules>` to deny the ``TABLE`` function type.
 
 To use the access control plugin, add an ``etc/access-control.properties`` file
-containing two required properties: ``access-control.name``, which must be set
-to ``file``, and ``security.config-file``, which must be set to the location
-of the config file. The configuration file location can either point to the local
-disc or to a rest endpoint. For example, if a config file named ``rules.json`` resides
+containing required properties: ``access-control.name``, which must be set
+to ``file`` or ``rest`` depending if we want to fetch the rules from local file or REST endpoint.
+If chosen ``file`` set ``security.config-file``, which must be set to the location
+of the config file. If ``rest`` set ``security.config-url``, which point to a rest endpoint.
+For example, if a config file named ``rules.json`` resides
 in ``etc``, add an ``etc/access-control.properties`` with the following
 contents:
 
@@ -50,8 +51,8 @@ should look like this:
 
 .. code-block:: text
 
-   access-control.name=file
-   security.config-file=http://trino-test/config
+   access-control.name=rest
+   security.config-url=http://trino-test/config
    security.json-pointer=/data
 
 The config file is specified in JSON format. It contains rules that define which

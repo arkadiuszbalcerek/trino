@@ -14,24 +14,51 @@
 package io.trino.plugin.base.security;
 
 import com.google.inject.Binder;
-import io.airlift.configuration.AbstractConfigurationAwareModule;
+import com.google.inject.Inject;
+import com.google.inject.Module;
+import com.google.inject.Provides;
+import io.airlift.log.Logger;
+import io.trino.plugin.base.CatalogName;
+import io.trino.spi.connector.ConnectorAccessControl;
 
-import static io.airlift.configuration.ConditionalModule.conditionalModule;
+import java.io.File;
+
+import static com.google.common.base.Suppliers.memoizeWithExpiration;
+import static io.airlift.configuration.ConfigBinder.configBinder;
+import static io.trino.plugin.base.util.JsonUtils.parseJson;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public class FileBasedAccessControlModule
-        extends AbstractConfigurationAwareModule
+        implements Module
 {
-    @Override
-    public void setup(Binder binder)
-    {
-        install(conditionalModule(
-                BaseAccessControlConfig.class,
-                config -> config.isRest(),
-                new RestBasedAccessControlModule()));
+    private static final Logger log = Logger.get(FileBasedAccessControlModule.class);
 
-        install(conditionalModule(
-                BaseAccessControlConfig.class,
-                config -> !config.isRest(),
-                new LocalFileBasedAccessControlModule()));
+    @Override
+    public void configure(Binder binder)
+    {
+        configBinder(binder).bindConfig(FileBasedAccessControlConfig.class);
+    }
+
+    @Inject
+    @Provides
+    public ConnectorAccessControl getConnectorAccessControl(CatalogName catalogName, FileBasedAccessControlConfig config)
+    {
+        File configFile = config.getConfigFile();
+        if (config.getRefreshPeriod() != null) {
+            return ForwardingConnectorAccessControl.of(memoizeWithExpiration(
+                    () -> {
+                        log.info("Refreshing access control for catalog '%s' from: %s", catalogName, configFile);
+                        return create(catalogName, configFile);
+                    },
+                    config.getRefreshPeriod().toMillis(),
+                    MILLISECONDS));
+        }
+        return create(catalogName, configFile);
+    }
+
+    private RulesBasedAccessControl create(CatalogName catalogName, File configFile)
+    {
+        AccessControlRules controlRules = parseJson(configFile.toPath(), AccessControlRules.class);
+        return new RulesBasedAccessControl(catalogName, controlRules);
     }
 }

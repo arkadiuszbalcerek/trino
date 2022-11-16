@@ -18,7 +18,7 @@ import io.airlift.units.Duration;
 import io.trino.client.ClientSession;
 import io.trino.client.QueryError;
 import io.trino.client.StatementClient;
-import io.trino.plugin.base.security.FileBasedSystemAccessControl;
+import io.trino.plugin.base.security.FileBasedSystemAccessControlFactory;
 import io.trino.plugin.tpch.TpchPlugin;
 import io.trino.spi.security.SystemAccessControl;
 import io.trino.testing.AbstractTestQueryFramework;
@@ -36,7 +36,7 @@ import java.util.Optional;
 import static com.google.common.io.Resources.getResource;
 import static io.trino.SessionTestUtils.TEST_SESSION;
 import static io.trino.client.StatementClientFactory.newStatementClient;
-import static io.trino.plugin.base.security.LocalFileBasedAccessControlConfig.SECURITY_CONFIG_FILE;
+import static io.trino.plugin.base.security.FileBasedAccessControlConfig.SECURITY_CONFIG_FILE;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
@@ -50,7 +50,7 @@ public class TestUserImpersonationAccessControl
             throws Exception
     {
         String securityConfigFile = getResource("access_control_rules.json").getPath();
-        SystemAccessControl accessControl = new FileBasedSystemAccessControl.Factory().create(ImmutableMap.of(SECURITY_CONFIG_FILE, securityConfigFile));
+        SystemAccessControl accessControl = new FileBasedSystemAccessControlFactory().create(ImmutableMap.of(SECURITY_CONFIG_FILE, securityConfigFile));
         QueryRunner queryRunner = DistributedQueryRunner.builder(TEST_SESSION)
                 .setNodeCount(1)
                 .setSystemAccessControl(accessControl)

@@ -14,33 +14,51 @@
 package io.trino.plugin.base.security;
 
 import com.google.inject.Binder;
-import io.airlift.configuration.AbstractConfigurationAwareModule;
-import io.airlift.configuration.ConfigurationFactory;
+import com.google.inject.Inject;
+import com.google.inject.Module;
+import com.google.inject.Provides;
+import io.airlift.log.Logger;
+import io.trino.spi.security.SystemAccessControl;
 
-import java.util.Map;
+import java.nio.file.Paths;
 
-import static io.airlift.configuration.ConditionalModule.conditionalModule;
+import static com.google.common.base.Suppliers.memoizeWithExpiration;
+import static io.airlift.configuration.ConfigBinder.configBinder;
+import static io.trino.plugin.base.util.JsonUtils.parseJson;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public class FileBasedSystemAccessControlModule
-        extends AbstractConfigurationAwareModule
+        implements Module
 {
-    public FileBasedSystemAccessControlModule(Map<String, String> config)
-    {
-        super();
-        this.setConfigurationFactory(new ConfigurationFactory(config));
-    }
+    private static final Logger log = Logger.get(FileBasedSystemAccessControlModule.class);
 
     @Override
-    public void setup(Binder binder)
+    public void configure(Binder binder)
     {
-        install(conditionalModule(
-                BaseAccessControlConfig.class,
-                config -> config.isRest(),
-                new RestBasedSystemAccessControlModule()));
+        configBinder(binder).bindConfig(FileBasedAccessControlConfig.class);
+    }
 
-        install(conditionalModule(
-                BaseAccessControlConfig.class,
-                config -> !config.isRest(),
-                new LocalFileBasedSystemAccessControlModule()));
+    @Inject
+    @Provides
+    public SystemAccessControl getSystemAccessControl(FileBasedAccessControlConfig config)
+    {
+        String configFilePath = config.getConfigFile().getPath();
+
+        if (config.getRefreshPeriod() != null) {
+            return ForwardingSystemAccessControl.of(memoizeWithExpiration(
+                    () -> {
+                        log.info("Refreshing system access control from %s", configFilePath);
+                        return create(configFilePath);
+                    },
+                    config.getRefreshPeriod().toMillis(),
+                    MILLISECONDS));
+        }
+        return create(configFilePath);
+    }
+
+    private SystemAccessControl create(String configFileName)
+    {
+        SystemAccessControlRules rules = parseJson(Paths.get(configFileName), SystemAccessControlRules.class);
+        return new SystemAccessControlFactory(rules).create();
     }
 }

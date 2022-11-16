@@ -14,6 +14,7 @@
 package io.trino.plugin.base.security;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.inject.Inject;
 import io.airlift.http.client.HttpClient;
 import io.airlift.http.client.HttpStatus;
 import io.airlift.http.client.Request;
@@ -27,29 +28,29 @@ import static io.airlift.http.client.StringResponseHandler.createStringResponseH
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
-public class AccessControlRulesRestExtractor<R>
+public class AccessControlRulesRestExtractor
 {
     private final HttpClient httpClient;
-    private final URI configUri;
-    private final String jsonPointer;
-    private final Class<R> clazz;
+    private final RestBasedAccessControlConfig config;
 
-    public AccessControlRulesRestExtractor(final HttpClient httpClient, final URI configUri, final String jsonPointer, Class<R> clazz)
+    @Inject
+    public AccessControlRulesRestExtractor(@ForAccessControlRules HttpClient httpClient, RestBasedAccessControlConfig config)
     {
-        this.httpClient = requireNonNull(httpClient);
-        this.configUri = requireNonNull(configUri);
-        this.jsonPointer = requireNonNull(jsonPointer);
-        this.clazz = requireNonNull(clazz);
+        this.httpClient = requireNonNull(httpClient, "httpClient is null");
+        this.config = requireNonNull(config, "config is null");
     }
 
-    public R extract()
+    public <R> R extract(Class<R> clazz)
     {
         String body = getRawJsonString();
-        return parseJSONString(body);
+        return parseJSONString(body, clazz);
     }
 
     private String getRawJsonString()
     {
+        String restUrl = config.getRestUrl();
+        URI configUri = URI.create(restUrl);
+
         Request request = prepareGet().setUri(configUri).build();
         StringResponseHandler.StringResponse response = httpClient.execute(request, createStringResponseHandler());
         int status = response.getStatusCode();
@@ -59,10 +60,10 @@ public class AccessControlRulesRestExtractor<R>
         return response.getBody();
     }
 
-    private R parseJSONString(String jsonString)
+    private <R> R parseJSONString(String jsonString, Class<R> clazz)
     {
         JsonNode node = JsonUtils.parseJson(jsonString, JsonNode.class);
-        JsonNode mappingsNode = node.at(jsonPointer);
+        JsonNode mappingsNode = node.at(config.getJsonPointer());
         return JsonUtils.jsonTreeToValue(mappingsNode, clazz);
     }
 }

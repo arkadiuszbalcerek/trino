@@ -19,7 +19,7 @@ import io.trino.Session;
 import io.trino.connector.MockConnectorFactory;
 import io.trino.connector.MockConnectorPlugin;
 import io.trino.connector.TestingTableFunctions;
-import io.trino.plugin.base.security.FileBasedSystemAccessControl;
+import io.trino.plugin.base.security.FileBasedSystemAccessControlFactory;
 import io.trino.plugin.blackhole.BlackHolePlugin;
 import io.trino.spi.connector.TableFunctionApplicationResult;
 import io.trino.spi.security.Identity;
@@ -32,7 +32,7 @@ import org.testng.annotations.Test;
 import java.util.Optional;
 
 import static com.google.common.io.Resources.getResource;
-import static io.trino.plugin.base.security.BaseAccessControlConfig.SECURITY_CONFIG_FILE;
+import static io.trino.plugin.base.security.FileBasedAccessControlConfig.SECURITY_CONFIG_FILE;
 import static io.trino.testing.TestingSession.testSessionBuilder;
 
 public class TestFunctionsInViewsWithFileBasedSystemAccessControl
@@ -47,7 +47,7 @@ public class TestFunctionsInViewsWithFileBasedSystemAccessControl
             throws Exception
     {
         String securityConfigFile = getResource("file-based-system-functions-access.json").getPath();
-        SystemAccessControl accessControl = new FileBasedSystemAccessControl.Factory().create(ImmutableMap.of(SECURITY_CONFIG_FILE, securityConfigFile));
+        SystemAccessControl accessControl = new FileBasedSystemAccessControlFactory().create(ImmutableMap.of(SECURITY_CONFIG_FILE, securityConfigFile));
         DistributedQueryRunner queryRunner = DistributedQueryRunner.builder(testSessionBuilder()
                         .setCatalog(Optional.empty())
                         .setSchema(Optional.empty())

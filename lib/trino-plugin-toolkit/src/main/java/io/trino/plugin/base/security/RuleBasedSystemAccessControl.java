@@ -15,8 +15,6 @@ package io.trino.plugin.base.security;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.inject.Injector;
-import io.airlift.bootstrap.Bootstrap;
 import io.trino.plugin.base.security.CatalogAccessControlRule.AccessMode;
 import io.trino.plugin.base.security.TableAccessControlRule.TablePrivilege;
 import io.trino.spi.connector.CatalogSchemaName;
@@ -28,7 +26,6 @@ import io.trino.spi.function.FunctionKind;
 import io.trino.spi.security.Identity;
 import io.trino.spi.security.Privilege;
 import io.trino.spi.security.SystemAccessControl;
-import io.trino.spi.security.SystemAccessControlFactory;
 import io.trino.spi.security.SystemSecurityContext;
 import io.trino.spi.security.TrinoPrincipal;
 import io.trino.spi.security.ViewExpression;
@@ -111,10 +108,9 @@ import static java.lang.String.format;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
 
-public class FileBasedSystemAccessControl
+public class RuleBasedSystemAccessControl
         implements SystemAccessControl
 {
-    public static final String NAME = "file";
     private static final String INFORMATION_SCHEMA_NAME = "information_schema";
 
     private final List<CatalogAccessControlRule> catalogRules;
@@ -130,7 +126,7 @@ public class FileBasedSystemAccessControl
     private final Set<AnyCatalogPermissionsRule> anyCatalogPermissionsRules;
     private final Set<AnyCatalogSchemaPermissionsRule> anyCatalogSchemaPermissionsRules;
 
-    private FileBasedSystemAccessControl(
+    protected RuleBasedSystemAccessControl(
             List<CatalogAccessControlRule> catalogRules,
             Optional<List<QueryAccessRule>> queryAccessRules,
             Optional<List<ImpersonationRule>> impersonationRules,
@@ -186,29 +182,6 @@ public class FileBasedSystemAccessControl
                 .flatMap(Optional::stream)
                 .forEach(anyCatalogSchemaPermissionsRules::add);
         this.anyCatalogSchemaPermissionsRules = anyCatalogSchemaPermissionsRules.build();
-    }
-
-    public static class Factory
-            implements SystemAccessControlFactory
-    {
-        @Override
-        public String getName()
-        {
-            return NAME;
-        }
-
-        @Override
-        public SystemAccessControl create(Map<String, String> config)
-        {
-            requireNonNull(config, "config is null");
-
-            Bootstrap bootstrap = new Bootstrap(new FileBasedSystemAccessControlModule(config));
-            Injector injector = bootstrap
-                    .doNotInitializeLogging()
-                    .setRequiredConfigurationProperties(config)
-                    .initialize();
-            return injector.getInstance(SystemAccessControl.class);
-        }
     }
 
     @Override
@@ -851,20 +824,20 @@ public class FileBasedSystemAccessControl
 
     @Override
     public void checkCanGrantRoles(SystemSecurityContext context,
-                                   Set<String> roles,
-                                   Set<TrinoPrincipal> grantees,
-                                   boolean adminOption,
-                                   Optional<TrinoPrincipal> grantor)
+            Set<String> roles,
+            Set<TrinoPrincipal> grantees,
+            boolean adminOption,
+            Optional<TrinoPrincipal> grantor)
     {
         denyGrantRoles(roles, grantees);
     }
 
     @Override
     public void checkCanRevokeRoles(SystemSecurityContext context,
-                                    Set<String> roles,
-                                    Set<TrinoPrincipal> grantees,
-                                    boolean adminOption,
-                                    Optional<TrinoPrincipal> grantor)
+            Set<String> roles,
+            Set<TrinoPrincipal> grantees,
+            boolean adminOption,
+            Optional<TrinoPrincipal> grantor)
     {
         denyRevokeRoles(roles, grantees);
     }
@@ -1010,7 +983,7 @@ public class FileBasedSystemAccessControl
         return checkTablePermission(context, table, READ_ONLY, privileges -> !privileges.isEmpty());
     }
 
-    private boolean checkTablePermission(SystemSecurityContext context, CatalogSchemaTableName table, TableAccessControlRule.TablePrivilege requiredPrivilege)
+    private boolean checkTablePermission(SystemSecurityContext context, CatalogSchemaTableName table, TablePrivilege requiredPrivilege)
     {
         AccessMode requiredCatalogAccess = requiredPrivilege == SELECT || requiredPrivilege == GRANT_SELECT ? READ_ONLY : ALL;
         return checkTablePermission(context, table, requiredCatalogAccess, privileges -> privileges.contains(requiredPrivilege));
@@ -1158,9 +1131,9 @@ public class FileBasedSystemAccessControl
             return this;
         }
 
-        public FileBasedSystemAccessControl build()
+        public RuleBasedSystemAccessControl build()
         {
-            return new FileBasedSystemAccessControl(
+            return new RuleBasedSystemAccessControl(
                     catalogRules,
                     queryAccessRules,
                     impersonationRules,

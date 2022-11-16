@@ -25,9 +25,10 @@ import io.trino.eventlistener.EventListenerManager;
 import io.trino.metadata.QualifiedObjectName;
 import io.trino.plugin.base.security.AllowAllSystemAccessControl;
 import io.trino.plugin.base.security.DefaultSystemAccessControl;
-import io.trino.plugin.base.security.FileBasedSystemAccessControl;
+import io.trino.plugin.base.security.FileBasedSystemAccessControlFactory;
 import io.trino.plugin.base.security.ForwardingSystemAccessControl;
 import io.trino.plugin.base.security.ReadOnlySystemAccessControl;
+import io.trino.plugin.base.security.RestBasedSystemAccessControlFactory;
 import io.trino.spi.QueryId;
 import io.trino.spi.TrinoException;
 import io.trino.spi.classloader.ThreadContextClassLoader;
@@ -111,7 +112,8 @@ public class AccessControlManager
         addSystemAccessControlFactory(new DefaultSystemAccessControl.Factory());
         addSystemAccessControlFactory(new AllowAllSystemAccessControl.Factory());
         addSystemAccessControlFactory(new ReadOnlySystemAccessControl.Factory());
-        addSystemAccessControlFactory(new FileBasedSystemAccessControl.Factory());
+        addSystemAccessControlFactory(new FileBasedSystemAccessControlFactory());
+        addSystemAccessControlFactory(new RestBasedSystemAccessControlFactory());
     }
 
     public final void addSystemAccessControlFactory(SystemAccessControlFactory accessControlFactory)
